@@ -359,10 +359,11 @@
                     questionsContainer.appendChild(questionCard);
                 });
 
-                // Render top banner if there are unanswered questions
+                // Render top banner based on attempt status and release flag
                 const existingBanner = document.getElementById('startExamBanner');
                 if (existingBanner) existingBanner.remove();
 
+                const form = document.getElementById('quizForm');
                 if (submittedAnswersCount < totalQuestionsCount) {
                     const banner = document.createElement('div');
                     banner.id = 'startExamBanner';
@@ -373,7 +374,14 @@
                             🚀 Enter Full Screen to Attempt
                         </button>
                     `;
-                    const form = document.getElementById('quizForm');
+                    form.parentNode.insertBefore(banner, form);
+                } else if (!data.quiz.show_answers) {
+                    const banner = document.createElement('div');
+                    banner.id = 'startExamBanner';
+                    banner.style = "background-color: #e8f4fd; color: #1c7ed6; padding: 15px; border-radius: 8px; font-weight: bold; margin-bottom: 25px; border: 1px solid #a5d8ff; text-align: center;";
+                    banner.innerHTML = `
+                        <span>🎉 Quiz Completed! Results and solutions will be available once released by the Administrator.</span>
+                    `;
                     form.parentNode.insertBefore(banner, form);
                 }
             } else {

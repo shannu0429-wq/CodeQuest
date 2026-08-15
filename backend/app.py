@@ -68,6 +68,7 @@ def before_request_func():
             cursor.execute("ALTER TABLE questions ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;")
             cursor.execute("ALTER TABLE questions ADD COLUMN IF NOT EXISTS solution_text TEXT NULL;")
             cursor.execute("ALTER TABLE questions ADD COLUMN IF NOT EXISTS solution_image VARCHAR(255) NULL;")
+            cursor.execute("ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS show_answers BOOLEAN DEFAULT FALSE;")
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS notifications (
                     id SERIAL PRIMARY KEY,
@@ -158,6 +159,7 @@ def dashboard():
                 q.id,
                 q.title,
                 q.description,
+                q.show_answers,
                 COALESCE(a.questions_attempted, 0) as questions_attempted,
                 COALESCE(a.correct_answers, 0) as correct_answers,
                 COALESCE((SELECT COUNT(*) FROM questions WHERE quiz_id = q.id), 0) as total_questions
@@ -250,6 +252,28 @@ def add_quiz():
         cursor.execute(
             "INSERT INTO quizzes (title, description) VALUES (%s, %s)",
             (title, description)
+        )
+        db.commit()
+        cursor.close()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/admin/quiz/<int:quiz_id>/toggle-answers", methods=["POST"])
+def toggle_quiz_answers(quiz_id):
+    user_id, role = get_auth()
+    if not user_id or role != "admin":
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = request.get_json() or {}
+    show_answers = data.get("show_answers", False)
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute(
+            "UPDATE quizzes SET show_answers = %s WHERE id = %s",
+            (show_answers, quiz_id)
         )
         db.commit()
         cursor.close()
@@ -514,8 +538,8 @@ def quiz(quiz_id):
                 question["created_at"] = None
 
             qid_str = str(question["id"])
-            if qid_str not in answered_map:
-                # Hide answer and solution from student to prevent cheating
+            if qid_str not in answered_map or not quiz_data["show_answers"]:
+                # Hide answer and solution from student to prevent cheating or before results release
                 question["correct_answer"] = None
                 question["solution_text"] = None
                 question["solution_image"] = None
@@ -660,17 +684,38 @@ def submit_single(quiz_id):
         db.commit()
         cursor.close()
 
-        # Retrieve solution to return
-        cursor.execute("SELECT solution_text, solution_image FROM questions WHERE id = %s", (question_id,))
-        solution_data = cursor.fetchone()
+        # Get show_answers flag from quizzes table
+        cursor.execute("""
+            SELECT q.show_answers 
+            FROM quizzes q
+            JOIN questions quest ON q.id = quest.quiz_id
+            WHERE quest.id = %s
+        """, (question_id,))
+        quiz_reveal_data = cursor.fetchone()
+        show_answers = quiz_reveal_data["show_answers"] if quiz_reveal_data else False
 
-        return jsonify({
-            "success": True,
-            "is_correct": is_correct,
-            "correct_answer": question["correct_answer"],
-            "solution_text": solution_data["solution_text"] if (solution_data and "solution_text" in solution_data) else None,
-            "solution_image": solution_data["solution_image"] if (solution_data and "solution_image" in solution_data) else None
-        })
+        if show_answers:
+            # Retrieve solution to return
+            cursor.execute("SELECT solution_text, solution_image FROM questions WHERE id = %s", (question_id,))
+            solution_data = cursor.fetchone()
+            cursor.close()
+
+            return jsonify({
+                "success": True,
+                "is_correct": is_correct,
+                "correct_answer": question["correct_answer"],
+                "solution_text": solution_data["solution_text"] if (solution_data and "solution_text" in solution_data) else None,
+                "solution_image": solution_data["solution_image"] if (solution_data and "solution_image" in solution_data) else None
+            })
+        else:
+            cursor.close()
+            return jsonify({
+                "success": True,
+                "is_correct": None,
+                "correct_answer": None,
+                "solution_text": None,
+                "solution_image": None
+            })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
