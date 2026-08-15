@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeQuest - Attempt Details Log</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="stylesheet" href="style.css">
+    <script src="config.js"></script>
+    <style>
+        .attempts-table-container {
+            margin-top: 30px;
+            overflow-x: auto;
+            background: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            text-align: left;
+            padding: 14px 16px;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            color: #495057;
+            text-transform: uppercase;
+            font-size: 13px;
+            letter-spacing: 0.5px;
+        }
+        tr:hover {
+            background-color: #fdfdfd;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-align: center;
+        }
+        .status-correct {
+            background-color: #ebfbee;
+            color: #2f9e44;
+            border: 1px solid #b7ebc6;
+        }
+        .status-wrong {
+            background-color: #fff5f5;
+            color: #e03131;
+            border: 1px solid #ffc9c9;
+        }
+        .user-name-cell {
+            font-weight: bold;
+            color: #212529;
+        }
+        .quiz-title-cell {
+            color: #495057;
+        }
+        .question-text-cell {
+            max-width: 300px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #868e96;
+            font-size: 13px;
+        }
+        .answer-val {
+            font-family: monospace;
+            font-weight: bold;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<div class="navbar">
+    <h2>CodeQuest 👑</h2>
+    <div>
+        <a href="admin.html">Admin Dashboard</a>
+        <a href="#" onclick="logout(); return false;">Logout</a>
+    </div>
+</div>
+
+<div class="container">
+    <div class="admin-header">
+        <h1>📊 Student Attempt Logs</h1>
+        <p>Inspect detailed responses of students for each quiz question they attempted.</p>
+    </div>
+
+    <!-- Table -->
+    <div class="attempts-table-container">
+        <h2>Detailed Attempts</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Student Name</th>
+                    <th>Quiz Title</th>
+                    <th>Question ID</th>
+                    <th>Question Text</th>
+                    <th>Attempted Choice</th>
+                    <th>Correct Answer</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="attemptsTableBody">
+                <tr>
+                    <td colspan="7">Loading logs...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    if (checkAuth('admin')) {
+        loadAttemptsLog();
+    }
+
+    async function loadAttemptsLog() {
+        const tableBody = document.getElementById('attemptsTableBody');
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/admin/attempts-log`, {
+                headers: getAuthHeaders()
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch attempts log');
+            }
+
+            const data = await response.json();
+            tableBody.innerHTML = '';
+
+            if (data.logs && data.logs.length > 0) {
+                data.logs.forEach(log => {
+                    const tr = document.createElement('tr');
+                    
+                    const statusClass = log.is_correct ? 'status-correct' : 'status-wrong';
+                    const statusText = log.is_correct ? '✓ Correct' : '✗ Incorrect';
+
+                    tr.innerHTML = `
+                        <td class="user-name-cell">${escapeHtml(log.username)}</td>
+                        <td class="quiz-title-cell">${escapeHtml(log.quiz_title)}</td>
+                        <td>#${escapeHtml(log.quiz_title.replace(/\s+/g, '_'))}_${log.question_id}</td>
+                        <td class="question-text-cell" title="${escapeHtml(log.question_text)}">${escapeHtml(log.question_text)}</td>
+                        <td class="answer-val">${escapeHtml(log.user_answer)}</td>
+                        <td class="answer-val" style="color: #2f9e44;">${escapeHtml(log.correct_answer)}</td>
+                        <td><span class="status-badge ${statusClass}">${statusText}</span></td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
+            } else {
+                tableBody.innerHTML = `<tr><td colspan="7">No attempts have been logged yet.</td></tr>`;
+            }
+        } catch (err) {
+            tableBody.innerHTML = `<tr><td colspan="7" style="color: red;">Error: ${err.message}</td></tr>`;
+        }
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+</script>
+</body>
+</html>

@@ -7,6 +7,77 @@
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="stylesheet" href="style.css">
     <script src="config.js"></script>
+    <style>
+        /* Interactive options and results styling */
+        .option.correct {
+            background-color: #ebfbee !important;
+            border-color: #2f9e44 !important;
+            color: #2f9e44 !important;
+        }
+        .option.incorrect {
+            background-color: #fff5f5 !important;
+            border-color: #e03131 !important;
+            color: #e03131 !important;
+        }
+        .option.correct .option-letter {
+            background-color: #2f9e44 !important;
+            color: white !important;
+        }
+        .option.incorrect .option-letter {
+            background-color: #e03131 !important;
+            color: white !important;
+        }
+        .question-submit-btn {
+            margin-top: 15px;
+            padding: 8px 16px;
+            background-color: #228be6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        .question-submit-btn:hover {
+            background-color: #1c7ed6;
+        }
+        .question-submit-btn:disabled {
+            background-color: #ced4da;
+            cursor: not-allowed;
+        }
+        .details-link {
+            color: #228be6;
+            text-decoration: underline;
+            cursor: pointer;
+            font-size: 13px;
+            display: inline-block;
+            margin-top: 12px;
+            font-weight: bold;
+        }
+        .details-box {
+            margin-top: 10px;
+            background: #f8f9fa;
+            border: 1px dashed #dee2e6;
+            padding: 12px 15px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #495057;
+            line-height: 1.5;
+        }
+        .review-banner {
+            background-color: #e3fafc;
+            color: #0c8599;
+            border: 1px solid #99e9f2;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+    </style>
 </head>
 <body>
 
@@ -20,6 +91,12 @@
 </div>
 
 <div class="quiz-container">
+    <!-- Review mode banner -->
+    <div id="reviewBanner" class="review-banner" style="display: none;">
+        <span>📊 Finished Test (Review Mode)</span>
+        <span id="reviewScore">Score: 0 / 0</span>
+    </div>
+
     <!-- Quiz Header -->
     <div class="quiz-header" id="quizHeader">
         <div>
@@ -33,11 +110,11 @@
         <!-- Questions container -->
         <div id="questionsContainer"></div>
 
-        <!-- Submit -->
-        <div class="submit-section">
-            <p>Make sure you have answered all questions.</p>
-            <button type="submit" class="submit-quiz-btn">
-                🚀 Submit Quiz
+        <!-- Submit Section -->
+        <div class="submit-section" id="submitSection" style="display: none; margin-top: 30px;">
+            <p>You have answered all questions. Click below to submit your exam.</p>
+            <button type="submit" class="submit-quiz-btn" style="background-color: #2f9e44;">
+                🏁 Finish Exam
             </button>
         </div>
     </form>
@@ -53,6 +130,10 @@
 <script>
     const urlParams = new URLSearchParams(window.location.search);
     const quizId = urlParams.get('id');
+    const isReview = urlParams.get('review') === 'true';
+
+    let totalQuestionsCount = 0;
+    let submittedAnswersCount = 0;
 
     if (!quizId) {
         window.location.href = 'dashboard.html';
@@ -78,26 +159,33 @@
 
             const data = await response.json();
 
-            if (data.attempted) {
-                // Redirect to already attempted page
-                window.location.href = `already_attempted.html?id=${quizId}&score=${data.attempt.final_score}`;
+            // If already attempted and NOT in review mode, redirect to review mode directly
+            if (data.attempted && !isReview) {
+                window.location.href = `quiz.html?id=${quizId}&review=true`;
                 return;
             }
 
-            // Render Header
+            // Set Header
             document.getElementById('quizTitle').textContent = data.quiz.title;
             document.getElementById('quizDescription').textContent = data.quiz.description || '';
+
+            if (isReview && data.attempted) {
+                document.getElementById('reviewBanner').style.display = 'flex';
+                document.getElementById('reviewScore').textContent = `Score: ${data.attempt.final_score} / ${data.questions.length}`;
+            }
 
             const questionsContainer = document.getElementById('questionsContainer');
             questionsContainer.innerHTML = '';
 
             if (data.questions && data.questions.length > 0) {
                 document.getElementById('quizForm').style.display = 'block';
+                totalQuestionsCount = data.questions.length;
 
                 data.questions.forEach((question, index) => {
                     const idx = index + 1;
                     const questionCard = document.createElement('div');
                     questionCard.className = 'quiz-question-card';
+                    questionCard.id = `card_${question.id}`;
 
                     let codeHtml = '';
                     if (question.code) {
@@ -111,6 +199,52 @@
                         `;
                     }
 
+                    // Format custom ID
+                    const cleanTitle = data.quiz.title.replace(/\s+/g, '_');
+                    const customQuestionId = `#${cleanTitle}_${idx}`;
+
+                    // Review mode answer mapping
+                    let userAns = null;
+                    let isUserCorrect = false;
+                    if (isReview && data.answers && data.answers[question.id]) {
+                        userAns = data.answers[question.id].user_answer;
+                        isUserCorrect = data.answers[question.id].is_correct;
+                    }
+
+                    // Options highlighting helper
+                    const getOptionClass = (optLetter) => {
+                        if (!isReview) return '';
+                        const correctAns = question.correct_answer;
+                        if (optLetter === correctAns) return 'correct';
+                        if (userAns === optLetter && optLetter !== correctAns) return 'incorrect';
+                        return '';
+                    };
+
+                    const getCheckedAttr = (optLetter) => {
+                        return (userAns === optLetter) ? 'checked' : '';
+                    };
+
+                    const disabledAttr = isReview ? 'disabled' : '';
+
+                    let actionHtml = '';
+                    if (!isReview) {
+                        actionHtml = `
+                            <button type="button" class="question-submit-btn" id="btn_${question.id}" onclick="submitSingleQuestion(${question.id})">
+                                Submit Answer
+                            </button>
+                        `;
+                    } else {
+                        // In review mode, show details link
+                        const createdAtVal = data.quiz.created_at || 'Recently';
+                        actionHtml = `
+                            <a class="details-link" onclick="toggleDetails(${question.id})">details</a>
+                            <div class="details-box" id="details_${question.id}" style="display: none;">
+                                <strong>Created At:</strong> ${escapeHtml(createdAtVal)}<br>
+                                <strong>Question ID:</strong> <code>${escapeHtml(customQuestionId)}</code>
+                            </div>
+                        `;
+                    }
+
                     questionCard.innerHTML = `
                         <div class="question-top">
                             <span class="question-number">Question ${idx}</span>
@@ -118,27 +252,30 @@
                         </div>
                         <h2>${escapeHtml(question.question)}</h2>
                         ${codeHtml}
-                        <div class="options">
-                            <label class="option">
-                                <input type="radio" name="question_${question.id}" value="A" required>
+                        <div class="options" id="opts_${question.id}">
+                            <label class="option ${getOptionClass('A')}" id="lbl_${question.id}_A">
+                                <input type="radio" name="question_${question.id}" value="A" ${getCheckedAttr('A')} ${disabledAttr} required>
                                 <span class="option-letter">A</span>
                                 <span class="option-text">${escapeHtml(question.option_a)}</span>
                             </label>
-                            <label class="option">
-                                <input type="radio" name="question_${question.id}" value="B">
+                            <label class="option ${getOptionClass('B')}" id="lbl_${question.id}_B">
+                                <input type="radio" name="question_${question.id}" value="B" ${getCheckedAttr('B')} ${disabledAttr}>
                                 <span class="option-letter">B</span>
                                 <span class="option-text">${escapeHtml(question.option_b)}</span>
                             </label>
-                            <label class="option">
-                                <input type="radio" name="question_${question.id}" value="C">
+                            <label class="option ${getOptionClass('C')}" id="lbl_${question.id}_C">
+                                <input type="radio" name="question_${question.id}" value="C" ${getCheckedAttr('C')} ${disabledAttr}>
                                 <span class="option-letter">C</span>
                                 <span class="option-text">${escapeHtml(question.option_c)}</span>
                             </label>
-                            <label class="option">
-                                <input type="radio" name="question_${question.id}" value="D">
+                            <label class="option ${getOptionClass('D')}" id="lbl_${question.id}_D">
+                                <input type="radio" name="question_${question.id}" value="D" ${getCheckedAttr('D')} ${disabledAttr}>
                                 <span class="option-letter">D</span>
                                 <span class="option-text">${escapeHtml(question.option_d)}</span>
                             </label>
+                        </div>
+                        <div style="margin-top: 15px;">
+                            ${actionHtml}
                         </div>
                     `;
                     questionsContainer.appendChild(questionCard);
@@ -152,25 +289,83 @@
         }
     }
 
+    async function submitSingleQuestion(questionId) {
+        const optionsContainer = document.getElementById(`opts_${questionId}`);
+        const selectedRadio = optionsContainer.querySelector('input[type="radio"]:checked');
+        const submitBtn = document.getElementById(`btn_${questionId}`);
+
+        if (!selectedRadio) {
+            alert('Please select an option first.');
+            return;
+        }
+
+        const selectedAnswer = selectedRadio.value;
+
+        // Disable all inputs for this question immediately
+        const radios = optionsContainer.querySelectorAll('input[type="radio"]');
+        radios.forEach(r => r.disabled = true);
+        submitBtn.disabled = true;
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/quiz/${quizId}/submit-single`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                    question_id: questionId,
+                    user_answer: selectedAnswer
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to submit answer');
+            }
+
+            const correctOption = data.correct_answer;
+
+            // Highlight selected and correct answers
+            radios.forEach(radio => {
+                const label = document.getElementById(`lbl_${questionId}_${radio.value}`);
+                if (radio.value === correctOption) {
+                    label.classList.add('correct');
+                } else if (radio.value === selectedAnswer) {
+                    label.classList.add('incorrect');
+                }
+            });
+
+            // Increment answered count
+            submittedAnswersCount++;
+            submitBtn.textContent = 'Submitted ✓';
+            
+            // Check if all submitted
+            if (submittedAnswersCount === totalQuestionsCount) {
+                document.getElementById('submitSection').style.display = 'block';
+            }
+        } catch (err) {
+            alert(err.message);
+            // Re-enable inputs if failed
+            radios.forEach(r => r.disabled = false);
+            submitBtn.disabled = false;
+        }
+    }
+
+    function toggleDetails(questionId) {
+        const detailsBox = document.getElementById(`details_${questionId}`);
+        if (detailsBox.style.display === 'none') {
+            detailsBox.style.display = 'block';
+        } else {
+            detailsBox.style.display = 'none';
+        }
+    }
+
     document.getElementById('quizForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         
-        const form = document.getElementById('quizForm');
-        const formData = new FormData(form);
-        const answers = {};
-
-        for (const [key, value] of formData.entries()) {
-            if (key.startsWith('question_')) {
-                const questionId = key.replace('question_', '');
-                answers[questionId] = value;
-            }
-        }
-
         try {
             const response = await fetch(`${API_BASE_URL}/api/quiz/${quizId}/submit`, {
                 method: 'POST',
-                headers: getAuthHeaders(),
-                body: JSON.stringify({ answers })
+                headers: getAuthHeaders()
             });
 
             const data = await response.json();
@@ -179,8 +374,8 @@
                 throw new Error(data.error || 'Failed to submit quiz');
             }
 
-            // Redirect to result page
-            window.location.href = `result.html?id=${quizId}&score=${data.score}&total=${data.total_questions}`;
+            // Redirect back to user's home page (dashboard.html)
+            window.location.href = 'dashboard.html';
         } catch (err) {
             alert(err.message);
         }

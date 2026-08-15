@@ -48,6 +48,18 @@ CREATE TABLE IF NOT EXISTS attempts (
     UNIQUE (user_id, quiz_id)
 );
 
+-- User Answers Table (stores individual choices per question)
+CREATE TABLE IF NOT EXISTS user_answers (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    quiz_id INT NOT NULL REFERENCES quizzes(id) ON DELETE CASCADE,
+    question_id INT NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    user_answer CHAR(1) NOT NULL,
+    is_correct BOOLEAN NOT NULL,
+    UNIQUE (user_id, question_id)
+);
+
+
 -- Insert Default Seed Data (Check if users exist before inserting)
 INSERT INTO users (username, password, role)
 VALUES 

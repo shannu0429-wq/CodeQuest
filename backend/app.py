@@ -430,11 +430,28 @@ def quiz(quiz_id):
             return jsonify({"error": "Quiz not found"}), 404
 
         if attempt:
+            cursor.execute(
+                "SELECT question_id, user_answer, is_correct FROM user_answers WHERE user_id = %s AND quiz_id = %s",
+                (user_id, quiz_id)
+            )
+            answers = cursor.fetchall()
+
+            cursor.execute(
+                "SELECT id, quiz_id, question, code, option_a, option_b, option_c, option_d, correct_answer FROM questions WHERE quiz_id = %s ORDER BY id",
+                (quiz_id,)
+            )
+            questions = cursor.fetchall()
+
+            if quiz_data.get("created_at"):
+                quiz_data["created_at"] = quiz_data["created_at"].strftime("%Y-%m-%d %H:%M:%S")
+
             cursor.close()
             return jsonify({
                 "attempted": True,
                 "quiz": quiz_data,
-                "attempt": attempt
+                "attempt": attempt,
+                "answers": {str(a["question_id"]): {"user_answer": a["user_answer"], "is_correct": a["is_correct"]} for a in answers},
+                "questions": questions
             })
 
         # Get questions
@@ -453,14 +470,56 @@ def quiz(quiz_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/api/quiz/<int:quiz_id>/submit", methods=["POST"])
-def submit_quiz(quiz_id):
+@app.route("/api/quiz/<int:quiz_id>/submit-single", methods=["POST"])
+def submit_single(quiz_id):
     user_id, role = get_auth()
     if not user_id:
         return jsonify({"error": "Unauthorized"}), 401
 
     data = request.get_json() or {}
-    answers = data.get("answers", {})
+    question_id = data.get("question_id")
+    user_answer = data.get("user_answer")
+
+    if not question_id or not user_answer:
+        return jsonify({"error": "Missing required fields"}), 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor(cursor_factory=RealDictCursor)
+
+        # Check correct answer
+        cursor.execute("SELECT correct_answer FROM questions WHERE id = %s AND quiz_id = %s", (question_id, quiz_id))
+        question = cursor.fetchone()
+        if not question:
+            cursor.close()
+            return jsonify({"error": "Question not found"}), 404
+
+        is_correct = (user_answer == question["correct_answer"])
+
+        # Insert/Update in user_answers table
+        cursor.execute("""
+            INSERT INTO user_answers (user_id, quiz_id, question_id, user_answer, is_correct)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (user_id, question_id) 
+            DO UPDATE SET user_answer = EXCLUDED.user_answer, is_correct = EXCLUDED.is_correct;
+        """, (user_id, quiz_id, question_id, user_answer, is_correct))
+
+        db.commit()
+        cursor.close()
+
+        return jsonify({
+            "success": True,
+            "is_correct": is_correct,
+            "correct_answer": question["correct_answer"]
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/quiz/<int:quiz_id>/submit", methods=["POST"])
+def submit_quiz(quiz_id):
+    user_id, role = get_auth()
+    if not user_id:
+        return jsonify({"error": "Unauthorized"}), 401
 
     try:
         db = get_db()
@@ -483,21 +542,16 @@ def submit_quiz(quiz_id):
             cursor.close()
             return jsonify({"error": "You have already attempted this quiz."}), 400
 
-        # Get questions
+        # Count correct answers in user_answers
         cursor.execute(
-            "SELECT id, correct_answer FROM questions WHERE quiz_id = %s ORDER BY id",
-            (quiz_id,)
+            "SELECT COUNT(*) as count FROM user_answers WHERE user_id = %s AND quiz_id = %s AND is_correct = True",
+            (user_id, quiz_id)
         )
-        questions = cursor.fetchall()
+        score = cursor.fetchone()["count"]
 
-        score = 0
-        for question in questions:
-            qid = question["id"]
-            user_ans = answers.get(str(qid)) or answers.get(qid)
-            if user_ans == question["correct_answer"]:
-                score += 1
-
-        total_questions = len(questions)
+        # Count total questions
+        cursor.execute("SELECT COUNT(*) as count FROM questions WHERE quiz_id = %s", (quiz_id,))
+        total_questions = cursor.fetchone()["count"]
 
         # Save attempt
         cursor.execute(
@@ -550,6 +604,81 @@ def submit_quiz(quiz_id):
             "score": score,
             "total_questions": total_questions
         })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/admin/attempts-log", methods=["GET"])
+def admin_attempts_log():
+    user_id, role = get_auth()
+    if not user_id or role != "admin":
+        return jsonify({"error": "Unauthorized"}), 401
+
+    try:
+        db = get_db()
+        cursor = db.cursor(cursor_factory=RealDictCursor)
+        
+        # Join user_answers with users, quizzes, and questions
+        cursor.execute("""
+            SELECT 
+                ua.id,
+                u.username,
+                qz.title as quiz_title,
+                q.id as question_id,
+                q.question as question_text,
+                ua.user_answer,
+                q.correct_answer,
+                ua.is_correct
+            FROM user_answers ua
+            JOIN users u ON ua.user_id = u.id
+            JOIN quizzes qz ON ua.quiz_id = qz.id
+            JOIN questions q ON ua.question_id = q.id
+            ORDER BY ua.id DESC
+        """)
+        logs = cursor.fetchall()
+        cursor.close()
+        return jsonify({"logs": logs})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/admin/users/<int:u_id>", methods=["DELETE"])
+def delete_user(u_id):
+    user_id, role = get_auth()
+    if not user_id or role != "admin":
+        return jsonify({"error": "Unauthorized"}), 401
+
+    # Check if admin is deleting themselves (not allowed)
+    if u_id == user_id:
+        return jsonify({"error": "You cannot delete your own admin account."}), 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("DELETE FROM users WHERE id = %s", (u_id,))
+        db.commit()
+        cursor.close()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/admin/users/<int:u_id>/password", methods=["PUT"])
+def change_user_password(u_id):
+    user_id, role = get_auth()
+    if not user_id or role != "admin":
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = request.get_json() or {}
+    new_password = data.get("password")
+
+    if not new_password:
+        return jsonify({"error": "Password is required"}), 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("UPDATE users SET password = %s WHERE id = %s", (new_password, u_id))
+        db.commit()
+        cursor.close()
+        return jsonify({"success": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

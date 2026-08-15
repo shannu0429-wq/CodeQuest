@@ -115,11 +115,12 @@
                     <th>Current Streak</th>
                     <th>Longest Streak</th>
                     <th>Last Quiz Date</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody id="usersTableBody">
                 <tr>
-                    <td colspan="6">Loading users...</td>
+                    <td colspan="7">Loading users...</td>
                 </tr>
             </tbody>
         </table>
@@ -145,11 +146,19 @@
             const data = await response.json();
             tableBody.innerHTML = '';
 
+            const currentAdminId = parseInt(localStorage.getItem('user_id'), 10);
+
             if (data.users && data.users.length > 0) {
                 data.users.forEach(user => {
                     const tr = document.createElement('tr');
                     const roleBadgeClass = user.role === 'admin' ? 'role-admin' : 'role-user';
                     
+                    // Disable delete button for the currently logged-in admin
+                    const isSelf = user.id === currentAdminId;
+                    const deleteBtnHtml = isSelf 
+                        ? `<button class="delete-btn" style="padding: 4px 8px; font-size: 12px; margin: 0; background-color: #ced4da; cursor: not-allowed;" disabled title="You cannot delete yourself">Delete</button>` 
+                        : `<button class="delete-btn" style="padding: 4px 8px; font-size: 12px; margin: 0; background-color: #e03131; color: white; border: none; border-radius: 4px; cursor: pointer;" onclick="deleteUser(${user.id}, '${escapeHtml(user.username)}')">Delete</button>`;
+
                     tr.innerHTML = `
                         <td>${user.id}</td>
                         <td><strong>${escapeHtml(user.username)}</strong></td>
@@ -157,14 +166,21 @@
                         <td>🔥 ${user.current_streak}</td>
                         <td>🏆 ${user.longest_streak}</td>
                         <td>📅 ${user.last_quiz_date || 'Never'}</td>
+                        <td>
+                            <div style="display: flex; gap: 8px; align-items: center;">
+                                <input type="password" id="pw_${user.id}" placeholder="New Password" style="padding: 6px; font-size: 12px; width: 110px; margin: 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;">
+                                <button class="btn edit-btn" style="padding: 6px 10px; font-size: 12px; margin: 0; font-weight: bold;" onclick="changePassword(${user.id}, '${escapeHtml(user.username)}')">Save</button>
+                                ${deleteBtnHtml}
+                            </div>
+                        </td>
                     `;
                     tableBody.appendChild(tr);
                 });
             } else {
-                tableBody.innerHTML = `<tr><td colspan="6">No users registered in the system.</td></tr>`;
+                tableBody.innerHTML = `<tr><td colspan="7">No users registered in the system.</td></tr>`;
             }
         } catch (err) {
-            tableBody.innerHTML = `<tr><td colspan="6" style="color: red;">Error: ${err.message}</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="7" style="color: red;">Error: ${err.message}</td></tr>`;
         }
     }
 
@@ -193,6 +209,62 @@
             alert(err.message);
         }
     });
+
+    async function deleteUser(userId, username) {
+        if (!confirm(`Are you sure you want to delete the user "${username}"?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}`, {
+                method: 'DELETE',
+                headers: getAuthHeaders()
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to delete user');
+            }
+
+            loadUsers();
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
+    async function changePassword(userId, username) {
+        const passwordInput = document.getElementById(`pw_${userId}`);
+        const password = passwordInput.value.trim();
+
+        if (!password) {
+            alert('Please enter a new password first.');
+            return;
+        }
+
+        if (!confirm(`Change password for "${username}"?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/password`, {
+                method: 'PUT',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ password })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to update password');
+            }
+
+            alert(`Password for "${username}" updated successfully!`);
+            passwordInput.value = '';
+        } catch (err) {
+            alert(err.message);
+        }
+    }
 
     function escapeHtml(text) {
         if (!text) return '';
