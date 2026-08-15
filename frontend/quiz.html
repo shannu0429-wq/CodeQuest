@@ -224,6 +224,7 @@
                     const getOptionClass = (optLetter) => {
                         if (!hasAnswered) return '';
                         const correctAns = question.correct_answer;
+                        if (!correctAns) return ''; // If answers are unreleased, don't color options
                         if (optLetter === correctAns) return 'correct';
                         if (userAns === optLetter && optLetter !== correctAns) return 'incorrect';
                         return '';
@@ -394,7 +395,8 @@
     }
 
     async function submitSingleQuestion(questionId) {
-        if (!isFullScreenActive() || !isPageVisible()) {
+        const fsModal = document.getElementById('fsModal');
+        if (fsModal && fsModal.style.display === 'flex') {
             alert('Security Violation: You must be in Full Screen mode to attempt answers.');
             return;
         }
@@ -455,14 +457,19 @@
             const correctOption = data.correct_answer;
 
             // Highlight selected and correct answers
-            radios.forEach(radio => {
-                const label = document.getElementById(`lbl_${questionId}_${radio.value}`);
-                if (radio.value === correctOption) {
-                    label.classList.add('correct');
-                } else if (radio.value === selectedAnswer) {
-                    label.classList.add('incorrect');
-                }
-            });
+            // Highlight selected and correct answers (only if answers are released)
+            if (correctOption) {
+                radios.forEach(radio => {
+                    const label = document.getElementById(`lbl_${questionId}_${radio.value}`);
+                    if (label) {
+                        if (radio.value === correctOption) {
+                            label.classList.add('correct');
+                        } else if (radio.value === selectedAnswer) {
+                            label.classList.add('incorrect');
+                        }
+                    }
+                });
+            }
 
             // Show solution if provided by admin
             if (data.solution_text || data.solution_image) {
