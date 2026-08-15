@@ -22,7 +22,7 @@
             margin-top: 15px;
             font-weight: bold;
         }
-        form input[type="text"], form textarea, form select {
+        form input[type="text"], form input[type="date"], form textarea, form select {
             width: 100%;
             padding: 10px;
             margin-top: 5px;
@@ -94,6 +94,15 @@
             <option value="D">D</option>
         </select>
 
+        <label>Upload Date <span class="optional">(YYYY-MM-DD)</span></label>
+        <input type="date" id="createdAt">
+
+        <label>Solution / Explanation Text:</label>
+        <textarea id="solutionText" rows="4"></textarea>
+
+        <label>Solution Image URL:</label>
+        <input type="text" id="solutionImage" placeholder="Enter solution image URL (e.g. https://...)">
+
         <button type="submit">
             Update Question
         </button>
@@ -138,6 +147,13 @@
             document.getElementById('optionC').value = question.option_c;
             document.getElementById('optionD').value = question.option_d;
             document.getElementById('correctAnswer').value = question.correct_answer;
+            
+            // Format created_at to YYYY-MM-DD for date input
+            if (question.created_at) {
+                document.getElementById('createdAt').value = question.created_at.substring(0, 10);
+            }
+            document.getElementById('solutionText').value = question.solution_text || '';
+            document.getElementById('solutionImage').value = question.solution_image || '';
 
             document.getElementById('backLink').href = `questions.html?id=${quizId}`;
         } catch (err) {
@@ -155,7 +171,10 @@
             option_b: document.getElementById('optionB').value,
             option_c: document.getElementById('optionC').value,
             option_d: document.getElementById('optionD').value,
-            correct_answer: document.getElementById('correctAnswer').value
+            correct_answer: document.getElementById('correctAnswer').value,
+            created_at: document.getElementById('createdAt').value || null,
+            solution_text: document.getElementById('solutionText').value || null,
+            solution_image: document.getElementById('solutionImage').value || null
         };
 
         try {

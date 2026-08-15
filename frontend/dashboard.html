@@ -13,10 +13,23 @@
 <!-- NAVBAR -->
 <div class="navbar">
     <h2>CodeQuest 💻</h2>
-    <div>
-        <a href="#" onclick="logout(); return false;">
-            Logout
-        </a>
+    <div style="display: flex; gap: 18px; align-items: center;">
+        <!-- Notification Dropdown Toggle -->
+        <div class="notif-container" style="position: relative; display: inline-block;">
+            <button id="notifBtn" onclick="toggleNotifDropdown()" style="background: none; border: none; font-size: 20px; cursor: pointer; color: white; position: relative; padding: 5px;">
+                🔔<span id="notifBadge" style="position: absolute; top: -2px; right: -2px; background-color: #e03131; color: white; font-size: 10px; font-weight: bold; border-radius: 50%; padding: 2px 6px; display: none;">0</span>
+            </button>
+            <div id="notifDropdown" style="display: none; position: absolute; right: 0; top: 35px; width: 300px; background: white; border: 1px solid #dee2e6; box-shadow: 0 4px 15px rgba(0,0,0,0.15); border-radius: 8px; z-index: 1000; max-height: 400px; overflow-y: auto;">
+                <div style="padding: 12px; font-weight: bold; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; color: #333;">
+                    <span>Announcements</span>
+                    <button onclick="markAllNotifAsRead()" style="background: none; border: none; font-size: 12px; color: #228be6; cursor: pointer; text-decoration: underline; padding: 0;">Mark Read</button>
+                </div>
+                <div id="notifList" style="padding: 0; margin: 0; color: #495057;">
+                    <div style="padding: 15px; text-align: center; color: #868e96;">No notifications.</div>
+                </div>
+            </div>
+        </div>
+        <a href="#" onclick="logout(); return false;" style="color: white; text-decoration: none; font-weight: bold;">Logout</a>
     </div>
 </div>
 
@@ -64,26 +77,6 @@
         </div>
     </div>
 
-    <!-- ABOUT & RULES SECTION -->
-    <div class="card" style="margin-top: 40px; text-align: left; padding: 25px;">
-        <h2 style="margin-top: 0; color: #212529; border-bottom: 2px solid #e9ecef; padding-bottom: 10px; display: flex; align-items: center; gap: 10px; font-size: 20px;">
-            ℹ️ Point-wise Rules & About CodeQuest
-        </h2>
-        <div style="display: flex; flex-wrap: wrap; gap: 30px; margin-top: 20px;">
-            <div style="flex: 1; min-width: 280px;">
-                <ul style="padding-left: 20px; line-height: 1.8; color: #495057; font-size: 14px;">
-                    <li><strong>Sign In / Registration:</strong> To join CodeQuest and request a login, you must join our official WhatsApp group.</li>
-                    <li><strong>WhatsApp Link:</strong> <a href="https://chat.whatsapp.com/KxkBoAR4l3H7HImPBqyZ74" target="_blank" style="color: #228be6; font-weight: bold; text-decoration: underline;">Join official WhatsApp group</a></li>
-                    <li><strong>Change Password:</strong> If you need to change your password, please contact the System Administrator.</li>
-                    <li><strong>Quiz Attempt Rule:</strong> Each quiz can be attempted <strong>only once</strong>. Once submitted, you cannot change your answers but you can review your completed attempt at any time.</li>
-                </ul>
-            </div>
-            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;">
-                <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://chat.whatsapp.com/KxkBoAR4l3H7HImPBqyZ74" alt="WhatsApp Group QR Code" style="width: 130px; height: 130px; border-radius: 4px; display: block;">
-                <span style="font-size: 11px; font-weight: bold; color: #868e96; margin-top: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Scan to Join Group</span>
-            </div>
-        </div>
-    </div>
 </div>
 
 <script>
@@ -91,6 +84,7 @@
     if (checkAuth('user')) {
         document.getElementById('usernameSpan').textContent = localStorage.getItem('username');
         loadDashboardData();
+        loadNotifications();
     }
 
     async function loadDashboardData() {
@@ -123,30 +117,31 @@
                     const quizCard = document.createElement('div');
                     quizCard.className = 'dashboard-quiz-card';
                     
-                    let attemptSectionHtml = '';
-                    if (quiz.attempted) {
-                        attemptSectionHtml = `
-                            <div class="attempted-box">
-                                <div class="attempted-icon">✓</div>
-                                <div class="attempted-content">
-                                    <strong>Quiz Already Attempted</strong>
-                                    <p>You have already completed this quiz.</p>
-                                    <div class="score-display" style="margin-bottom: 12px;">
-                                        ⭐ Your Score: <strong>${quiz.score}</strong>
-                                    </div>
-                                    <a href="quiz.html?id=${quiz.id}&review=true" class="start-quiz-btn" style="background-color: #0c8599; border-color: #0c8599; text-align: center; display: inline-block;">
-                                        🔍 Review Finished Test
-                                    </a>
-                                </div>
+                    let attemptStatusHtml = `
+                        <div style="margin: 15px 0; font-size: 14px; color: #495057; background-color: #f1f3f5; padding: 12px; border-radius: 6px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                <span>📝 Attempted:</span>
+                                <strong>${quiz.questions_attempted} / ${quiz.total_questions}</strong>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>🏆 Previous Score:</span>
+                                <strong>${quiz.correct_answers} / ${quiz.total_questions}</strong>
+                            </div>
+                        </div>
+                    `;
+
+                    let buttonHtml = '';
+                    if (quiz.total_questions > 0 && quiz.questions_attempted === quiz.total_questions) {
+                        buttonHtml = `
+                            <div style="margin-top: 10px; padding: 8px; background-color: #ebfbee; color: #2f9e44; border: 1px solid #b7ebc6; border-radius: 6px; text-align: center; font-weight: bold; font-size: 13px;">
+                                ✓ Completed
                             </div>
                         `;
                     } else {
-                        attemptSectionHtml = `
-                            <div class="available-box">
-                                <span>🟢 Available</span>
-                            </div>
-                            <a href="quiz.html?id=${quiz.id}" class="start-quiz-btn">
-                                🚀 Start Quiz
+                        const btnText = quiz.questions_attempted > 0 ? '🚀 Continue Quiz' : '🚀 Start Quiz';
+                        buttonHtml = `
+                            <a href="quiz.html?id=${quiz.id}" class="start-quiz-btn" style="text-align: center; display: block; margin-top: 10px;">
+                                ${btnText}
                             </a>
                         `;
                     }
@@ -155,7 +150,8 @@
                         <div class="quiz-card-icon">💻</div>
                         <h2>${escapeHtml(quiz.title)}</h2>
                         <p>${escapeHtml(quiz.description || '')}</p>
-                        ${attemptSectionHtml}
+                        ${attemptStatusHtml}
+                        ${buttonHtml}
                     `;
                     quizzesContainer.appendChild(quizCard);
                 });
@@ -177,6 +173,85 @@
             `;
         }
     }
+
+    async function loadNotifications() {
+        const notifBadge = document.getElementById('notifBadge');
+        const notifList = document.getElementById('notifList');
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/notifications`, {
+                headers: getAuthHeaders()
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            
+            notifList.innerHTML = '';
+            let unreadCount = 0;
+
+            if (data.notifications && data.notifications.length > 0) {
+                data.notifications.forEach(notif => {
+                    if (!notif.is_read) unreadCount++;
+                    const notifItem = document.createElement('div');
+                    notifItem.style.padding = '12px 15px';
+                    notifItem.style.borderBottom = '1px solid #f1f3f5';
+                    notifItem.style.fontSize = '13px';
+                    notifItem.style.lineHeight = '1.4';
+                    notifItem.style.backgroundColor = notif.is_read ? 'transparent' : '#f8f9fa';
+
+                    notifItem.innerHTML = `
+                        <div style="color: #212529; font-weight: ${notif.is_read ? 'normal' : 'bold'};">${escapeHtml(notif.message)}</div>
+                        <div style="color: #868e96; font-size: 10px; margin-top: 5px;">${notif.created_at}</div>
+                    `;
+                    notifList.appendChild(notifItem);
+                });
+            } else {
+                notifList.innerHTML = `<div style="padding: 15px; text-align: center; color: #868e96;">No announcements yet.</div>`;
+            }
+
+            if (unreadCount > 0) {
+                notifBadge.textContent = unreadCount;
+                notifBadge.style.display = 'inline-block';
+            } else {
+                notifBadge.style.display = 'none';
+            }
+        } catch (err) {
+            console.error('Error loading notifications:', err);
+        }
+    }
+
+    function toggleNotifDropdown() {
+        const dropdown = document.getElementById('notifDropdown');
+        if (dropdown.style.display === 'none') {
+            dropdown.style.display = 'block';
+            // Mark as read when opened
+            markAllNotifAsRead();
+        } else {
+            dropdown.style.display = 'none';
+        }
+    }
+
+    async function markAllNotifAsRead() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/notifications/read`, {
+                method: 'POST',
+                headers: getAuthHeaders()
+            });
+            if (response.ok) {
+                const badge = document.getElementById('notifBadge');
+                badge.style.display = 'none';
+            }
+        } catch (err) {
+            console.error('Error marking notifications as read:', err);
+        }
+    }
+
+    // Close dropdown on click outside
+    window.addEventListener('click', (e) => {
+        const dropdown = document.getElementById('notifDropdown');
+        const btn = document.getElementById('notifBtn');
+        if (dropdown && dropdown.style.display === 'block' && !btn.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
 
     function escapeHtml(text) {
         if (!text) return '';

@@ -29,7 +29,10 @@ CREATE TABLE IF NOT EXISTS questions (
     option_b VARCHAR(255) NOT NULL,
     option_c VARCHAR(255) NOT NULL,
     option_d VARCHAR(255) NOT NULL,
-    correct_answer CHAR(1) NOT NULL CHECK (correct_answer IN ('A', 'B', 'C', 'D'))
+    correct_answer CHAR(1) NOT NULL CHECK (correct_answer IN ('A', 'B', 'C', 'D')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    solution_text TEXT NULL,
+    solution_image VARCHAR(255) NULL
 );
 
 -- Attempts Table

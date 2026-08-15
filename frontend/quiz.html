@@ -65,17 +65,14 @@
             color: #495057;
             line-height: 1.5;
         }
-        .review-banner {
-            background-color: #e3fafc;
-            color: #0c8599;
-            border: 1px solid #99e9f2;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 25px;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+        .solution-box {
+            margin-top: 15px;
+            padding: 12px;
+            background: #e8f4fd;
+            border-left: 4px solid #1c7ed6;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #2b3a42;
         }
     </style>
 </head>
@@ -84,19 +81,28 @@
 <!-- Navbar -->
 <div class="navbar">
     <h2>CodeQuest 💻</h2>
-    <div>
-        <a href="dashboard.html">Dashboard</a>
-        <a href="#" onclick="logout(); return false;">Logout</a>
+    <div style="display: flex; gap: 18px; align-items: center;">
+        <!-- Notification Dropdown Toggle -->
+        <div class="notif-container" style="position: relative; display: inline-block;">
+            <button id="notifBtn" onclick="toggleNotifDropdown()" style="background: none; border: none; font-size: 20px; cursor: pointer; color: white; position: relative; padding: 5px;">
+                🔔<span id="notifBadge" style="position: absolute; top: -2px; right: -2px; background-color: #e03131; color: white; font-size: 10px; font-weight: bold; border-radius: 50%; padding: 2px 6px; display: none;">0</span>
+            </button>
+            <div id="notifDropdown" style="display: none; position: absolute; right: 0; top: 35px; width: 300px; background: white; border: 1px solid #dee2e6; box-shadow: 0 4px 15px rgba(0,0,0,0.15); border-radius: 8px; z-index: 1000; max-height: 400px; overflow-y: auto;">
+                <div style="padding: 12px; font-weight: bold; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; color: #333;">
+                    <span>Announcements</span>
+                    <button onclick="markAllNotifAsRead()" style="background: none; border: none; font-size: 12px; color: #228be6; cursor: pointer; text-decoration: underline; padding: 0;">Mark Read</button>
+                </div>
+                <div id="notifList" style="padding: 0; margin: 0; color: #495057;">
+                    <div style="padding: 15px; text-align: center; color: #868e96;">No notifications.</div>
+                </div>
+            </div>
+        </div>
+        <a href="dashboard.html" style="color: white; text-decoration: none; font-weight: bold;">Dashboard</a>
+        <a href="#" onclick="logout(); return false;" style="color: white; text-decoration: none; font-weight: bold;">Logout</a>
     </div>
 </div>
 
 <div class="quiz-container">
-    <!-- Review mode banner -->
-    <div id="reviewBanner" class="review-banner" style="display: none;">
-        <span>📊 Finished Test (Review Mode)</span>
-        <span id="reviewScore">Score: 0 / 0</span>
-    </div>
-
     <!-- Quiz Header -->
     <div class="quiz-header" id="quizHeader">
         <div>
@@ -106,17 +112,9 @@
         <div class="quiz-badge">🧠 Quiz</div>
     </div>
 
-    <form id="quizForm" style="display: none;">
+    <form id="quizForm" style="display: none;" onsubmit="return false;">
         <!-- Questions container -->
         <div id="questionsContainer"></div>
-
-        <!-- Submit Section -->
-        <div class="submit-section" id="submitSection" style="display: none; margin-top: 30px;">
-            <p>You have answered all questions. Click below to submit your exam.</p>
-            <button type="submit" class="submit-quiz-btn" style="background-color: #2f9e44;">
-                🏁 Finish Exam
-            </button>
-        </div>
     </form>
 
     <div class="empty-card" id="noQuestionsCard" style="display: none;">
@@ -130,10 +128,6 @@
 <script>
     const urlParams = new URLSearchParams(window.location.search);
     const quizId = urlParams.get('id');
-    const isReview = urlParams.get('review') === 'true';
-
-    let totalQuestionsCount = 0;
-    let submittedAnswersCount = 0;
 
     if (!quizId) {
         window.location.href = 'dashboard.html';
@@ -141,6 +135,7 @@
 
     if (checkAuth('user')) {
         loadQuiz();
+        loadNotifications();
     }
 
     async function loadQuiz() {
@@ -159,27 +154,15 @@
 
             const data = await response.json();
 
-            // If already attempted and NOT in review mode, redirect to review mode directly
-            if (data.attempted && !isReview) {
-                window.location.href = `quiz.html?id=${quizId}&review=true`;
-                return;
-            }
-
             // Set Header
             document.getElementById('quizTitle').textContent = data.quiz.title;
             document.getElementById('quizDescription').textContent = data.quiz.description || '';
-
-            if (isReview && data.attempted) {
-                document.getElementById('reviewBanner').style.display = 'flex';
-                document.getElementById('reviewScore').textContent = `Score: ${data.attempt.final_score} / ${data.questions.length}`;
-            }
 
             const questionsContainer = document.getElementById('questionsContainer');
             questionsContainer.innerHTML = '';
 
             if (data.questions && data.questions.length > 0) {
                 document.getElementById('quizForm').style.display = 'block';
-                totalQuestionsCount = data.questions.length;
 
                 data.questions.forEach((question, index) => {
                     const idx = index + 1;
@@ -203,17 +186,16 @@
                     const cleanTitle = data.quiz.title.replace(/\s+/g, '_');
                     const customQuestionId = `#${cleanTitle}_${idx}`;
 
-                    // Review mode answer mapping
+                    // Check if already answered
+                    const hasAnswered = data.answers && data.answers[question.id] !== undefined;
                     let userAns = null;
-                    let isUserCorrect = false;
-                    if (isReview && data.answers && data.answers[question.id]) {
+                    if (hasAnswered) {
                         userAns = data.answers[question.id].user_answer;
-                        isUserCorrect = data.answers[question.id].is_correct;
                     }
 
                     // Options highlighting helper
                     const getOptionClass = (optLetter) => {
-                        if (!isReview) return '';
+                        if (!hasAnswered) return '';
                         const correctAns = question.correct_answer;
                         if (optLetter === correctAns) return 'correct';
                         if (userAns === optLetter && optLetter !== correctAns) return 'incorrect';
@@ -224,25 +206,39 @@
                         return (userAns === optLetter) ? 'checked' : '';
                     };
 
-                    const disabledAttr = isReview ? 'disabled' : '';
+                    const disabledAttr = hasAnswered ? 'disabled' : '';
+
+                    // Solution html if answered
+                    let solutionHtml = '';
+                    if (hasAnswered && (question.solution_text || question.solution_image)) {
+                        solutionHtml = `
+                            <div class="solution-box">
+                                <strong>💡 Solution:</strong>
+                                ${question.solution_text ? `<p style="margin: 5px 0 0 0;">${escapeHtml(question.solution_text)}</p>` : ''}
+                                ${question.solution_image ? `<img src="${escapeHtml(question.solution_image)}" style="max-width: 100%; margin-top: 10px; border-radius: 4px; display: block;">` : ''}
+                            </div>
+                        `;
+                    }
+
+                    // Upload Date & ID accordion
+                    const uploadDateVal = question.created_at || 'Recently';
+                    const detailsAccordionHtml = `
+                        <a class="details-link" onclick="toggleDetails(${question.id})">details</a>
+                        <div class="details-box" id="details_${question.id}" style="display: none;">
+                            <strong>Uploaded On:</strong> ${escapeHtml(uploadDateVal)}<br>
+                            <strong>Question ID:</strong> <code>${escapeHtml(customQuestionId)}</code>
+                        </div>
+                    `;
 
                     let actionHtml = '';
-                    if (!isReview) {
+                    if (!hasAnswered) {
                         actionHtml = `
                             <button type="button" class="question-submit-btn" id="btn_${question.id}" onclick="submitSingleQuestion(${question.id})">
                                 Submit Answer
                             </button>
                         `;
                     } else {
-                        // In review mode, show details link
-                        const createdAtVal = data.quiz.created_at || 'Recently';
-                        actionHtml = `
-                            <a class="details-link" onclick="toggleDetails(${question.id})">details</a>
-                            <div class="details-box" id="details_${question.id}" style="display: none;">
-                                <strong>Created At:</strong> ${escapeHtml(createdAtVal)}<br>
-                                <strong>Question ID:</strong> <code>${escapeHtml(customQuestionId)}</code>
-                            </div>
-                        `;
+                        actionHtml = `<span style="font-weight: bold; color: #2f9e44; font-size: 14px; display: inline-block; margin-top: 10px;">Submitted ✓</span>`;
                     }
 
                     questionCard.innerHTML = `
@@ -274,8 +270,14 @@
                                 <span class="option-text">${escapeHtml(question.option_d)}</span>
                             </label>
                         </div>
-                        <div style="margin-top: 15px;">
+                        <div id="sol_container_${question.id}">
+                            ${solutionHtml}
+                        </div>
+                        <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                             ${actionHtml}
+                            <div style="text-align: right;">
+                                ${detailsAccordionHtml}
+                            </div>
                         </div>
                     `;
                     questionsContainer.appendChild(questionCard);
@@ -334,14 +336,19 @@
                 }
             });
 
-            // Increment answered count
-            submittedAnswersCount++;
-            submitBtn.textContent = 'Submitted ✓';
-            
-            // Check if all submitted
-            if (submittedAnswersCount === totalQuestionsCount) {
-                document.getElementById('submitSection').style.display = 'block';
+            // Show solution if provided by admin
+            if (data.solution_text || data.solution_image) {
+                const solContainer = document.getElementById(`sol_container_${questionId}`);
+                solContainer.innerHTML = `
+                    <div class="solution-box">
+                        <strong>💡 Solution:</strong>
+                        ${data.solution_text ? `<p style="margin: 5px 0 0 0;">${escapeHtml(data.solution_text)}</p>` : ''}
+                        ${data.solution_image ? `<img src="${escapeHtml(data.solution_image)}" style="max-width: 100%; margin-top: 10px; border-radius: 4px; display: block;">` : ''}
+                    </div>
+                `;
             }
+
+            submitBtn.outerHTML = `<span style="font-weight: bold; color: #2f9e44; font-size: 14px; display: inline-block; margin-top: 10px;">Submitted ✓</span>`;
         } catch (err) {
             alert(err.message);
             // Re-enable inputs if failed
@@ -359,25 +366,82 @@
         }
     }
 
-    document.getElementById('quizForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
+    async function loadNotifications() {
+        const notifBadge = document.getElementById('notifBadge');
+        const notifList = document.getElementById('notifList');
         try {
-            const response = await fetch(`${API_BASE_URL}/api/quiz/${quizId}/submit`, {
+            const response = await fetch(`${API_BASE_URL}/api/notifications`, {
+                headers: getAuthHeaders()
+            });
+            if (!response.ok) return;
+            const data = await response.json();
+            
+            notifList.innerHTML = '';
+            let unreadCount = 0;
+
+            if (data.notifications && data.notifications.length > 0) {
+                data.notifications.forEach(notif => {
+                    if (!notif.is_read) unreadCount++;
+                    const notifItem = document.createElement('div');
+                    notifItem.style.padding = '12px 15px';
+                    notifItem.style.borderBottom = '1px solid #f1f3f5';
+                    notifItem.style.fontSize = '13px';
+                    notifItem.style.lineHeight = '1.4';
+                    notifItem.style.backgroundColor = notif.is_read ? 'transparent' : '#f8f9fa';
+
+                    notifItem.innerHTML = `
+                        <div style="color: #212529; font-weight: ${notif.is_read ? 'normal' : 'bold'};">${escapeHtml(notif.message)}</div>
+                        <div style="color: #868e96; font-size: 10px; margin-top: 5px;">${notif.created_at}</div>
+                    `;
+                    notifList.appendChild(notifItem);
+                });
+            } else {
+                notifList.innerHTML = `<div style="padding: 15px; text-align: center; color: #868e96;">No announcements yet.</div>`;
+            }
+
+            if (unreadCount > 0) {
+                notifBadge.textContent = unreadCount;
+                notifBadge.style.display = 'inline-block';
+            } else {
+                notifBadge.style.display = 'none';
+            }
+        } catch (err) {
+            console.error('Error loading notifications:', err);
+        }
+    }
+
+    function toggleNotifDropdown() {
+        const dropdown = document.getElementById('notifDropdown');
+        if (dropdown.style.display === 'none') {
+            dropdown.style.display = 'block';
+            // Mark as read when opened
+            markAllNotifAsRead();
+        } else {
+            dropdown.style.display = 'none';
+        }
+    }
+
+    async function markAllNotifAsRead() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/notifications/read`, {
                 method: 'POST',
                 headers: getAuthHeaders()
             });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Failed to submit quiz');
+            if (response.ok) {
+                const badge = document.getElementById('notifBadge');
+                badge.style.display = 'none';
             }
-
-            // Redirect back to user's home page (dashboard.html)
-            window.location.href = 'dashboard.html';
         } catch (err) {
-            alert(err.message);
+            console.error('Error marking notifications as read:', err);
+        }
+    }
+
+    // Close dropdown on click outside
+    window.addEventListener('click', (e) => {
+        const dropdown = document.getElementById('notifDropdown');
+        const btn = document.getElementById('notifBtn');
+        if (dropdown && dropdown.style.display === 'block' && !btn.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.style.display = 'none';
         }
     });
 

@@ -62,13 +62,22 @@
             </div>
 
             <label>Correct Answer</label>
-            <select id="correctAnswer" required>
+            <select id="correctAnswer" required style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; margin-bottom: 15px;">
                 <option value="">Select correct answer</option>
                 <option value="A">A</option>
                 <option value="B">B</option>
                 <option value="C">C</option>
                 <option value="D">D</option>
             </select>
+
+            <label>Upload Date <span class="optional">Optional (defaults to today)</span></label>
+            <input type="date" id="createdAt" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; margin-bottom: 15px;">
+
+            <label>Solution / Explanation Text <span class="optional">Optional</span></label>
+            <textarea id="solutionText" rows="3" placeholder="Enter solution explanation text..."></textarea>
+
+            <label>Solution Image URL <span class="optional">Optional</span></label>
+            <input type="text" id="solutionImage" placeholder="Enter solution image URL (e.g. https://...)" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; margin-bottom: 20px;">
 
             <button type="submit" class="add-question-btn">
                 ➕ Add Question
@@ -146,10 +155,17 @@
                     const optCClass = question.correct_answer === 'C' ? 'correct-option' : '';
                     const optDClass = question.correct_answer === 'D' ? 'correct-option' : '';
 
+                    // Format created_at to YYYY-MM-DD
+                    let dateStr = 'Default';
+                    if (question.created_at) {
+                        // If it has a timezone / full ISO timestamp from database, extract first 10 characters
+                        dateStr = question.created_at.substring(0, 10);
+                    }
+
                     card.innerHTML = `
                         <div class="question-card-header">
                             <span class="question-number-admin">Question ${index + 1}</span>
-                            <span class="question-id">ID: ${question.id}</span>
+                            <span class="question-id">ID: ${question.id} | Date: ${dateStr}</span>
                         </div>
                         <h3>${escapeHtml(question.question)}</h3>
                         ${codeHtml}
@@ -175,7 +191,11 @@
                                 ${question.correct_answer === 'D' ? '<strong>✓ Correct</strong>' : ''}
                             </div>
                         </div>
-                        <div class="question-actions">
+                        <div style="margin-top: 12px; padding: 10px; background-color: #f8f9fa; border: 1px dashed #dee2e6; border-radius: 4px; font-size: 13px;">
+                            <strong>💡 Solution Text:</strong> ${question.solution_text ? escapeHtml(question.solution_text) : '<em>None</em>'}<br>
+                            <strong>🖼️ Solution Image:</strong> ${question.solution_image ? `<a href="${escapeHtml(question.solution_image)}" target="_blank" style="color: #228be6; text-decoration: underline; font-weight: bold;">View Image</a>` : '<em>None</em>'}
+                        </div>
+                        <div class="question-actions" style="margin-top: 15px;">
                             <a href="edit_question.html?id=${question.id}" class="edit-question-btn">✏️ Edit</a>
                             <button class="delete-question-btn" onclick="deleteQuestion(${question.id})">🗑️ Delete</button>
                         </div>
@@ -205,7 +225,10 @@
             option_b: document.getElementById('optionB').value,
             option_c: document.getElementById('optionC').value,
             option_d: document.getElementById('optionD').value,
-            correct_answer: document.getElementById('correctAnswer').value
+            correct_answer: document.getElementById('correctAnswer').value,
+            created_at: document.getElementById('createdAt').value || null,
+            solution_text: document.getElementById('solutionText').value || null,
+            solution_image: document.getElementById('solutionImage').value || null
         };
 
         try {

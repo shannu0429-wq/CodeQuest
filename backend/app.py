@@ -59,6 +59,31 @@ def get_db():
             raise e
     return db_connection
 
+@app.before_request
+def before_request_func():
+    if not hasattr(app, '_migrations_run'):
+        try:
+            db = get_db()
+            cursor = db.cursor()
+            cursor.execute("ALTER TABLE questions ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;")
+            cursor.execute("ALTER TABLE questions ADD COLUMN IF NOT EXISTS solution_text TEXT NULL;")
+            cursor.execute("ALTER TABLE questions ADD COLUMN IF NOT EXISTS solution_image VARCHAR(255) NULL;")
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS notifications (
+                    id SERIAL PRIMARY KEY,
+                    user_id INT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    message TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    is_read BOOLEAN DEFAULT FALSE
+                );
+            """)
+            db.commit()
+            cursor.close()
+            app._migrations_run = True
+            print("Database migrations applied successfully!")
+        except Exception as e:
+            print("Database migrations failed:", e)
+
 # Helper function to get current user from headers
 def get_auth():
     user_id = request.headers.get("X-User-Id")
@@ -133,7 +158,9 @@ def dashboard():
                 q.id,
                 q.title,
                 q.description,
-                a.final_score
+                COALESCE(a.questions_attempted, 0) as questions_attempted,
+                COALESCE(a.correct_answers, 0) as correct_answers,
+                COALESCE((SELECT COUNT(*) FROM questions WHERE quiz_id = q.id), 0) as total_questions
             FROM quizzes q
             LEFT JOIN attempts a
                 ON q.id = a.quiz_id
@@ -147,12 +174,8 @@ def dashboard():
 
         # Add attempted status
         for quiz in quizzes:
-            if quiz["final_score"] is not None:
-                quiz["attempted"] = True
-                quiz["score"] = quiz["final_score"]
-            else:
-                quiz["attempted"] = False
-                quiz["score"] = 0
+            # If they have attempted at least one question, set attempted = True
+            quiz["attempted"] = quiz["questions_attempted"] > 0
 
         return jsonify({
             "user": user,
@@ -292,6 +315,9 @@ def add_question(quiz_id):
     option_c = data.get("option_c")
     option_d = data.get("option_d")
     correct_answer = data.get("correct_answer")
+    created_at = data.get("created_at") or None
+    solution_text = data.get("solution_text") or None
+    solution_image = data.get("solution_image") or None
 
     if not all([question, option_a, option_b, option_c, option_d, correct_answer]):
         return jsonify({"error": "Missing required fields"}), 400
@@ -299,12 +325,13 @@ def add_question(quiz_id):
     try:
         db = get_db()
         cursor = db.cursor()
+        
         cursor.execute(
             """
-            INSERT INTO questions (quiz_id, question, code, option_a, option_b, option_c, option_d, correct_answer)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            INSERT INTO questions (quiz_id, question, code, option_a, option_b, option_c, option_d, correct_answer, created_at, solution_text, solution_image)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, COALESCE(%s, CURRENT_TIMESTAMP), %s, %s)
             """,
-            (quiz_id, question, code, option_a, option_b, option_c, option_d, correct_answer)
+            (quiz_id, question, code, option_a, option_b, option_c, option_d, correct_answer, created_at, solution_text, solution_image)
         )
         db.commit()
         cursor.close()
@@ -342,6 +369,8 @@ def edit_question(question_id):
             cursor.close()
             if not question:
                 return jsonify({"error": "Question not found"}), 404
+            if question.get("created_at"):
+                question["created_at"] = question["created_at"].strftime("%Y-%m-%d")
             return jsonify({"question": question})
 
         # PUT request
@@ -353,6 +382,9 @@ def edit_question(question_id):
         option_c = data.get("option_c")
         option_d = data.get("option_d")
         correct_answer = data.get("correct_answer")
+        created_at = data.get("created_at") or None
+        solution_text = data.get("solution_text") or None
+        solution_image = data.get("solution_image") or None
 
         if not all([question_text, option_a, option_b, option_c, option_d, correct_answer]):
             cursor.close()
@@ -361,10 +393,10 @@ def edit_question(question_id):
         cursor.execute(
             """
             UPDATE questions
-            SET question = %s, code = %s, option_a = %s, option_b = %s, option_c = %s, option_d = %s, correct_answer = %s
+            SET question = %s, code = %s, option_a = %s, option_b = %s, option_c = %s, option_d = %s, correct_answer = %s, created_at = COALESCE(%s, CURRENT_TIMESTAMP), solution_text = %s, solution_image = %s
             WHERE id = %s
             """,
-            (question_text, code, option_a, option_b, option_c, option_d, correct_answer, question_id)
+            (question_text, code, option_a, option_b, option_c, option_d, correct_answer, created_at, solution_text, solution_image, question_id)
         )
         db.commit()
         cursor.close()
@@ -414,7 +446,7 @@ def quiz(quiz_id):
         db = get_db()
         cursor = db.cursor(cursor_factory=RealDictCursor)
 
-        # Check whether user already attempted this quiz
+        # Check whether user has an attempt record
         cursor.execute(
             "SELECT * FROM attempts WHERE user_id = %s AND quiz_id = %s",
             (user_id, quiz_id)
@@ -429,43 +461,44 @@ def quiz(quiz_id):
             cursor.close()
             return jsonify({"error": "Quiz not found"}), 404
 
-        if attempt:
-            cursor.execute(
-                "SELECT question_id, user_answer, is_correct FROM user_answers WHERE user_id = %s AND quiz_id = %s",
-                (user_id, quiz_id)
-            )
-            answers = cursor.fetchall()
-
-            cursor.execute(
-                "SELECT id, quiz_id, question, code, option_a, option_b, option_c, option_d, correct_answer FROM questions WHERE quiz_id = %s ORDER BY id",
-                (quiz_id,)
-            )
-            questions = cursor.fetchall()
-
-            if quiz_data.get("created_at"):
-                quiz_data["created_at"] = quiz_data["created_at"].strftime("%Y-%m-%d %H:%M:%S")
-
-            cursor.close()
-            return jsonify({
-                "attempted": True,
-                "quiz": quiz_data,
-                "attempt": attempt,
-                "answers": {str(a["question_id"]): {"user_answer": a["user_answer"], "is_correct": a["is_correct"]} for a in answers},
-                "questions": questions
-            })
+        # Get user answers
+        cursor.execute(
+            "SELECT question_id, user_answer, is_correct FROM user_answers WHERE user_id = %s AND quiz_id = %s",
+            (user_id, quiz_id)
+        )
+        answers = cursor.fetchall()
+        answered_map = {str(a["question_id"]): {"user_answer": a["user_answer"], "is_correct": a["is_correct"]} for a in answers}
 
         # Get questions
         cursor.execute(
-            "SELECT id, quiz_id, question, code, option_a, option_b, option_c, option_d FROM questions WHERE quiz_id = %s ORDER BY id",
+            "SELECT id, quiz_id, question, code, option_a, option_b, option_c, option_d, correct_answer, created_at, solution_text, solution_image FROM questions WHERE quiz_id = %s ORDER BY id",
             (quiz_id,)
         )
         questions = cursor.fetchall()
-        cursor.close()
 
+        # Format times and hide solutions/answers for unanswered questions
+        for question in questions:
+            if question.get("created_at"):
+                question["created_at"] = question["created_at"].strftime("%Y-%m-%d")
+            else:
+                question["created_at"] = None
+
+            qid_str = str(question["id"])
+            if qid_str not in answered_map:
+                # Hide answer and solution from student to prevent cheating
+                question["correct_answer"] = None
+                question["solution_text"] = None
+                question["solution_image"] = None
+
+        if quiz_data.get("created_at"):
+            quiz_data["created_at"] = quiz_data["created_at"].strftime("%Y-%m-%d %H:%M:%S")
+
+        cursor.close()
         return jsonify({
-            "attempted": False,
             "quiz": quiz_data,
-            "questions": questions
+            "attempt": attempt,
+            "questions": questions,
+            "answers": answered_map
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -504,65 +537,31 @@ def submit_single(quiz_id):
             DO UPDATE SET user_answer = EXCLUDED.user_answer, is_correct = EXCLUDED.is_correct;
         """, (user_id, quiz_id, question_id, user_answer, is_correct))
 
-        db.commit()
-        cursor.close()
-
-        return jsonify({
-            "success": True,
-            "is_correct": is_correct,
-            "correct_answer": question["correct_answer"]
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/api/quiz/<int:quiz_id>/submit", methods=["POST"])
-def submit_quiz(quiz_id):
-    user_id, role = get_auth()
-    if not user_id:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    try:
-        db = get_db()
-        cursor = db.cursor(cursor_factory=RealDictCursor)
-
-        # Check whether quiz exists
-        cursor.execute("SELECT * FROM quizzes WHERE id = %s", (quiz_id,))
-        quiz_data = cursor.fetchone()
-        if not quiz_data:
-            cursor.close()
-            return jsonify({"error": "Quiz not found"}), 404
-
-        # Check whether user already attempted
-        cursor.execute(
-            "SELECT * FROM attempts WHERE user_id = %s AND quiz_id = %s",
-            (user_id, quiz_id)
-        )
-        existing_attempt = cursor.fetchone()
-        if existing_attempt:
-            cursor.close()
-            return jsonify({"error": "You have already attempted this quiz."}), 400
-
-        # Count correct answers in user_answers
+        # Recalculate and update attempts table (increment score and attempted questions)
         cursor.execute(
             "SELECT COUNT(*) as count FROM user_answers WHERE user_id = %s AND quiz_id = %s AND is_correct = True",
             (user_id, quiz_id)
         )
-        score = cursor.fetchone()["count"]
+        correct_count = cursor.fetchone()["count"]
 
-        # Count total questions
-        cursor.execute("SELECT COUNT(*) as count FROM questions WHERE quiz_id = %s", (quiz_id,))
-        total_questions = cursor.fetchone()["count"]
-
-        # Save attempt
         cursor.execute(
-            """
-            INSERT INTO attempts (user_id, quiz_id, final_score)
-            VALUES (%s, %s, %s)
-            """,
-            (user_id, quiz_id, score)
+            "SELECT COUNT(*) as count FROM user_answers WHERE user_id = %s AND quiz_id = %s",
+            (user_id, quiz_id)
         )
+        attempted_count = cursor.fetchone()["count"]
 
-        # Get user streak information
+        # Insert/Update attempts
+        cursor.execute("""
+            INSERT INTO attempts (user_id, quiz_id, questions_attempted, correct_answers, final_score)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (user_id, quiz_id)
+            DO UPDATE SET 
+                questions_attempted = EXCLUDED.questions_attempted,
+                correct_answers = EXCLUDED.correct_answers,
+                final_score = EXCLUDED.final_score;
+        """, (user_id, quiz_id, attempted_count, correct_count, correct_count))
+
+        # Get and update user streak immediately
         cursor.execute(
             "SELECT current_streak, longest_streak, last_quiz_date FROM users WHERE id = %s",
             (user_id,)
@@ -574,36 +573,105 @@ def submit_quiz(quiz_id):
         longest_streak = user["longest_streak"]
         last_quiz_date = user["last_quiz_date"]
 
-        if last_quiz_date is None:
-            current_streak = 1
-        elif last_quiz_date == today:
-            pass # Keep current
-        elif last_quiz_date == today - timedelta(days=1):
-            current_streak += 1
-        else:
-            current_streak = 1
+        if last_quiz_date != today:
+            if last_quiz_date is None:
+                current_streak = 1
+            elif last_quiz_date == today - timedelta(days=1):
+                current_streak += 1
+            else:
+                current_streak = 1
 
-        if current_streak > longest_streak:
-            longest_streak = current_streak
+            if current_streak > longest_streak:
+                longest_streak = current_streak
 
-        # Update user streak
-        cursor.execute(
-            """
-            UPDATE users
-            SET current_streak = %s, longest_streak = %s, last_quiz_date = %s
-            WHERE id = %s
-            """,
-            (current_streak, longest_streak, today, user_id)
-        )
+            cursor.execute(
+                """
+                UPDATE users
+                SET current_streak = %s, longest_streak = %s, last_quiz_date = %s
+                WHERE id = %s
+                """,
+                (current_streak, longest_streak, today, user_id)
+            )
 
         db.commit()
         cursor.close()
 
+        # Retrieve solution to return
+        cursor.execute("SELECT solution_text, solution_image FROM questions WHERE id = %s", (question_id,))
+        solution_data = cursor.fetchone()
+
         return jsonify({
             "success": True,
-            "score": score,
-            "total_questions": total_questions
+            "is_correct": is_correct,
+            "correct_answer": question["correct_answer"],
+            "solution_text": solution_data["solution_text"] if (solution_data and "solution_text" in solution_data) else None,
+            "solution_image": solution_data["solution_image"] if (solution_data and "solution_image" in solution_data) else None
         })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/notifications", methods=["GET"])
+def get_notifications():
+    user_id, role = get_auth()
+    if not user_id:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    try:
+        db = get_db()
+        cursor = db.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("""
+            SELECT id, message, created_at, is_read 
+            FROM notifications 
+            WHERE user_id = %s OR user_id IS NULL 
+            ORDER BY created_at DESC
+        """, (user_id,))
+        notifications = cursor.fetchall()
+        for n in notifications:
+            n["created_at"] = n["created_at"].strftime("%Y-%m-%d %H:%M:%S")
+        cursor.close()
+        return jsonify({"notifications": notifications})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/notifications/read", methods=["POST"])
+def mark_notifications_read():
+    user_id, role = get_auth()
+    if not user_id:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("UPDATE notifications SET is_read = True WHERE user_id = %s OR user_id IS NULL", (user_id,))
+        db.commit()
+        cursor.close()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/admin/notifications", methods=["POST"])
+def admin_create_notification():
+    user_id, role = get_auth()
+    if not user_id or role != "admin":
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = request.get_json() or {}
+    target_user_id = data.get("user_id") or None
+    message = data.get("message")
+
+    if not message:
+        return jsonify({"error": "Message is required"}), 400
+
+    try:
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute("""
+            INSERT INTO notifications (user_id, message)
+            VALUES (%s, %s)
+        """, (target_user_id, message))
+        db.commit()
+        cursor.close()
+        return jsonify({"success": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
