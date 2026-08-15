@@ -594,6 +594,10 @@
     }
 
     async function startQuizAttemptFlow() {
+        // Request full screen synchronously first to satisfy browser user-gesture requirements
+        enterFullScreenQuiz();
+        hasStartedAttempt = true;
+
         try {
             const response = await fetch(`${API_BASE_URL}/api/quiz/${quizId}/start-attempt`, {
                 method: 'POST',
@@ -601,12 +605,10 @@
             });
             if (!response.ok) {
                 const errData = await response.json();
-                throw new Error(errData.error || 'Failed to initialize attempt');
+                console.error(errData.error || 'Failed to initialize attempt');
             }
-            hasStartedAttempt = true;
-            enterFullScreenQuiz();
         } catch (err) {
-            alert(err.message);
+            console.error('Error starting attempt:', err);
         }
     }
 
