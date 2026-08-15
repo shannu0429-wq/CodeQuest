@@ -14,6 +14,7 @@
 <div class="navbar">
     <h2>CodeQuest 👑</h2>
     <div>
+        <a href="users.html" target="_blank" style="margin-right: 15px; color: white; text-decoration: none; font-weight: bold;">👥 Manage Users</a>
         <span>Admin Panel</span>
         <a href="#" onclick="logout(); return false;">Logout</a>
     </div>
@@ -38,6 +39,12 @@
             <h3>👑 Role</h3>
             <div class="stat-number">Admin</div>
             <p>Full access</p>
+        </div>
+
+        <div class="card" style="cursor: pointer;" onclick="window.open('users.html', '_blank')">
+            <h3>👥 Users</h3>
+            <div class="stat-number" id="userCount">0</div>
+            <p>Manage users &rarr;</p>
         </div>
     </div>
 
@@ -104,6 +111,19 @@
             
             // Set stats
             document.getElementById('quizCount').textContent = data.quizzes.length;
+
+            // Fetch and set user count
+            try {
+                const usersResponse = await fetch(`${API_BASE_URL}/api/admin/users`, {
+                    headers: getAuthHeaders()
+                });
+                if (usersResponse.ok) {
+                    const usersData = await usersResponse.json();
+                    document.getElementById('userCount').textContent = usersData.users.length;
+                }
+            } catch (err) {
+                console.error("Failed to load user count", err);
+            }
 
             // Render quizzes
             quizzesGrid.innerHTML = '';

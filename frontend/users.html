@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeQuest - User Management</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="stylesheet" href="style.css">
+    <script src="config.js"></script>
+    <style>
+        /* Specific layout helper for tables in users.html */
+        .users-table-container {
+            margin-top: 30px;
+            overflow-x: auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        tr:hover {
+            background-color: #f1f3f5;
+        }
+        .role-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .role-admin {
+            background-color: #ffe8cc;
+            color: #d9480f;
+        }
+        .role-user {
+            background-color: #e3fafc;
+            color: #0c8599;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<div class="navbar">
+    <h2>CodeQuest 👑</h2>
+    <div>
+        <a href="admin.html">Admin Dashboard</a>
+        <a href="#" onclick="logout(); return false;">Logout</a>
+    </div>
+</div>
+
+<div class="container">
+    <div class="admin-header">
+        <h1>👥 User Management</h1>
+        <p>Inspect existing users, monitor streaks, and create new users.</p>
+    </div>
+
+    <!-- Add User Form -->
+    <div class="admin-form">
+        <h2>➕ Create New User</h2>
+        <form id="addUserForm">
+            <label>Username</label>
+            <input
+                type="text"
+                id="usernameInput"
+                placeholder="Enter username"
+                required
+            >
+            <br>
+
+            <label>Password</label>
+            <input
+                type="text"
+                id="passwordInput"
+                placeholder="Enter password"
+                required
+            >
+            <br>
+
+            <label>Role</label>
+            <select id="roleSelect" required>
+                <option value="user">User (Student)</option>
+                <option value="admin">Admin</option>
+            </select>
+            <br>
+
+            <button type="submit">
+                Create User
+            </button>
+        </form>
+    </div>
+
+    <!-- Users Table -->
+    <div class="users-table-container">
+        <h2>📚 Registered Users</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Current Streak</th>
+                    <th>Longest Streak</th>
+                    <th>Last Quiz Date</th>
+                </tr>
+            </thead>
+            <tbody id="usersTableBody">
+                <tr>
+                    <td colspan="6">Loading users...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    if (checkAuth('admin')) {
+        loadUsers();
+    }
+
+    async function loadUsers() {
+        const tableBody = document.getElementById('usersTableBody');
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/admin/users`, {
+                headers: getAuthHeaders()
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch users list');
+            }
+
+            const data = await response.json();
+            tableBody.innerHTML = '';
+
+            if (data.users && data.users.length > 0) {
+                data.users.forEach(user => {
+                    const tr = document.createElement('tr');
+                    const roleBadgeClass = user.role === 'admin' ? 'role-admin' : 'role-user';
+                    
+                    tr.innerHTML = `
+                        <td>${user.id}</td>
+                        <td><strong>${escapeHtml(user.username)}</strong></td>
+                        <td><span class="role-badge ${roleBadgeClass}">${user.role}</span></td>
+                        <td>🔥 ${user.current_streak}</td>
+                        <td>🏆 ${user.longest_streak}</td>
+                        <td>📅 ${user.last_quiz_date || 'Never'}</td>
+                    `;
+                    tableBody.appendChild(tr);
+                });
+            } else {
+                tableBody.innerHTML = `<tr><td colspan="6">No users registered in the system.</td></tr>`;
+            }
+        } catch (err) {
+            tableBody.innerHTML = `<tr><td colspan="6" style="color: red;">Error: ${err.message}</td></tr>`;
+        }
+    }
+
+    document.getElementById('addUserForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('usernameInput').value;
+        const password = document.getElementById('passwordInput').value;
+        const role = document.getElementById('roleSelect').value;
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/admin/users`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ username, password, role })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to create user');
+            }
+
+            document.getElementById('addUserForm').reset();
+            loadUsers();
+        } catch (err) {
+            alert(err.message);
+        }
+    });
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+</script>
+</body>
+</html>

@@ -186,6 +186,47 @@ def add_quiz():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/admin/users", methods=["GET", "POST"])
+def manage_users():
+    user_id, role = get_auth()
+    if not user_id or role != "admin":
+        return jsonify({"error": "Unauthorized"}), 401
+
+    try:
+        db = get_db()
+        cursor = db.cursor(cursor_factory=RealDictCursor)
+
+        if request.method == "GET":
+            cursor.execute("SELECT id, username, role, current_streak, longest_streak, last_quiz_date FROM users ORDER BY id")
+            users = cursor.fetchall()
+            cursor.close()
+            # Convert date objects to string for JSON serialization
+            for u in users:
+                if u["last_quiz_date"]:
+                    u["last_quiz_date"] = u["last_quiz_date"].strftime("%Y-%m-%d")
+            return jsonify({"users": users})
+
+        # POST request
+        data = request.get_json() or {}
+        username = data.get("username")
+        password = data.get("password")
+        user_role = data.get("role", "user")
+
+        if not username or not password:
+            cursor.close()
+            return jsonify({"error": "Username and password are required"}), 400
+
+        cursor.execute(
+            "INSERT INTO users (username, password, role) VALUES (%s, %s, %s)",
+            (username, password, user_role)
+        )
+        db.commit()
+        cursor.close()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/admin/quiz/<int:quiz_id>", methods=["GET"])
 def manage_questions(quiz_id):
     user_id, role = get_auth()
