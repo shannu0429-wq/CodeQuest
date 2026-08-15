@@ -2,7 +2,8 @@ import os
 from datetime import date, timedelta
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import mysql.connector
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 # Import notifications if available
 try:
@@ -26,18 +27,17 @@ db_connection = None
 
 def get_db():
     global db_connection
-    if db_connection is None or not db_connection.is_connected():
+    if db_connection is None or db_connection.closed != 0:
         try:
-            db_connection = mysql.connector.connect(
-                host=os.environ.get("DB_HOST", "localhost"),
-                user=os.environ.get("DB_USER", "root"),
-                password=os.environ.get("DB_PASSWORD", "admin"),
-                database=os.environ.get("DB_NAME", "codequest_db"),
-                port=int(os.environ.get("DB_PORT", "3306"))
+            # Supabase / PostgreSQL connection string
+            database_url = os.environ.get(
+                "DATABASE_URL", 
+                "postgresql://postgres:postgres@localhost:5432/codequest_db"
             )
-            print("MySQL database connected successfully")
+            db_connection = psycopg2.connect(database_url)
+            print("PostgreSQL database connected successfully")
         except Exception as e:
-            print("MySQL connection failed:", e)
+            print("PostgreSQL connection failed:", e)
             raise e
     return db_connection
 
@@ -60,7 +60,7 @@ def login():
 
     try:
         db = get_db()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=RealDictCursor)
         cursor.execute(
             "SELECT * FROM users WHERE username = %s",
             (username,)
@@ -88,7 +88,7 @@ def dashboard():
 
     try:
         db = get_db()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=RealDictCursor)
 
         # Get user details
         cursor.execute(
@@ -98,7 +98,7 @@ def dashboard():
         user = cursor.fetchone()
         if not user:
             cursor.close()
-            return jsonify({"error": "User not found"}), 44
+            return jsonify({"error": "User not found"}), 404
             
         # Get total score
         cursor.execute(
@@ -152,7 +152,7 @@ def admin():
 
     try:
         db = get_db()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=RealDictCursor)
         cursor.execute("SELECT * FROM quizzes ORDER BY id DESC")
         quizzes = cursor.fetchall()
         cursor.close()
@@ -194,7 +194,7 @@ def manage_questions(quiz_id):
 
     try:
         db = get_db()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=RealDictCursor)
 
         # Get quiz
         cursor.execute("SELECT * FROM quizzes WHERE id = %s", (quiz_id,))
@@ -275,7 +275,7 @@ def edit_question(question_id):
 
     try:
         db = get_db()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=RealDictCursor)
 
         if request.method == "GET":
             cursor.execute("SELECT * FROM questions WHERE id = %s", (question_id,))
@@ -353,7 +353,7 @@ def quiz(quiz_id):
 
     try:
         db = get_db()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=RealDictCursor)
 
         # Check whether user already attempted this quiz
         cursor.execute(
@@ -405,7 +405,7 @@ def submit_quiz(quiz_id):
 
     try:
         db = get_db()
-        cursor = db.cursor(dictionary=True)
+        cursor = db.cursor(cursor_factory=RealDictCursor)
 
         # Check whether quiz exists
         cursor.execute("SELECT * FROM quizzes WHERE id = %s", (quiz_id,))
