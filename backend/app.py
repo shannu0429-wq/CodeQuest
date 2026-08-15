@@ -34,6 +34,12 @@ def get_db():
                 "DATABASE_URL", 
                 "postgresql://postgres.ywbfdhcllimmargcjvds:Shanmukha%40429@aws-0-ap-southeast-2.pooler.supabase.com:6543/postgres"
             )
+            # Clean up pgbouncer query parameter as it crashes psycopg2 connection parser
+            if "?" in database_url:
+                base_uri, query = database_url.split("?", 1)
+                params = [p for p in query.split("&") if not p.startswith("pgbouncer=")]
+                database_url = base_uri + ("?" + "&".join(params) if params else "")
+                
             db_connection = psycopg2.connect(database_url)
             print("PostgreSQL database connected successfully")
         except Exception as e:
