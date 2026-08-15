@@ -170,12 +170,42 @@ def dashboard():
             (user_id,)
         )
         quizzes = cursor.fetchall()
+
+        # Get all questions to map sequence indexes
+        cursor.execute("SELECT id, quiz_id FROM questions ORDER BY quiz_id, id")
+        all_questions = cursor.fetchall()
+        
+        quiz_q_map = {}
+        for q in all_questions:
+            qid = q["quiz_id"]
+            if qid not in quiz_q_map:
+                quiz_q_map[qid] = []
+            quiz_q_map[qid].append(q["id"])
+
+        # Get user answered logs
+        cursor.execute("SELECT quiz_id, question_id FROM user_answers WHERE user_id = %s", (user_id,))
+        user_answers = cursor.fetchall()
+
+        attempted_questions_map = {}
+        for ans in user_answers:
+            qid = ans["quiz_id"]
+            quest_id = ans["question_id"]
+            if qid in quiz_q_map:
+                try:
+                    seq_num = quiz_q_map[qid].index(quest_id) + 1
+                    if qid not in attempted_questions_map:
+                        attempted_questions_map[qid] = []
+                    attempted_questions_map[qid].append(seq_num)
+                except ValueError:
+                    pass
+
         cursor.close()
 
-        # Add attempted status
+        # Add attempted status and list
         for quiz in quizzes:
             # If they have attempted at least one question, set attempted = True
             quiz["attempted"] = quiz["questions_attempted"] > 0
+            quiz["attempted_list"] = sorted(attempted_questions_map.get(quiz["id"], []))
 
         return jsonify({
             "user": user,

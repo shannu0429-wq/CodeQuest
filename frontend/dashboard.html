@@ -117,6 +117,22 @@
                     const quizCard = document.createElement('div');
                     quizCard.className = 'dashboard-quiz-card';
                     
+                    let badgesHtml = '';
+                    if (quiz.attempted_list && quiz.attempted_list.length > 0) {
+                        badgesHtml = `
+                            <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; border-top: 1px solid #dee2e6; padding-top: 8px; align-items: center;">
+                                <span style="font-size: 11px; color: #868e96; font-weight: bold; margin-right: 3px;">Attempted:</span>
+                                ${quiz.attempted_list.map(num => `<span style="background-color: #d3f9d8; color: #2b8a3e; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold;">Q${num}</span>`).join('')}
+                            </div>
+                        `;
+                    } else {
+                        badgesHtml = `
+                            <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; border-top: 1px solid #dee2e6; padding-top: 8px; align-items: center;">
+                                <span style="font-size: 11px; color: #868e96; font-weight: bold;">Attempted: None</span>
+                            </div>
+                        `;
+                    }
+
                     let attemptStatusHtml = `
                         <div style="margin: 15px 0; font-size: 14px; color: #495057; background-color: #f1f3f5; padding: 12px; border-radius: 6px;">
                             <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
@@ -127,6 +143,7 @@
                                 <span>🏆 Previous Score:</span>
                                 <strong>${quiz.correct_answers} / ${quiz.total_questions}</strong>
                             </div>
+                            ${badgesHtml}
                         </div>
                     `;
 

@@ -262,7 +262,7 @@
 
                     questionCard.innerHTML = `
                         <div class="question-top">
-                            <span class="question-number">Question ${idx}</span>
+                            <span class="question-number">Question ${idx} (Custom ID: <strong>${customQuestionId}</strong>)</span>
                             <span class="question-count">${idx} / ${data.questions.length}</span>
                         </div>
                         <h2>${escapeHtml(question.question)}</h2>
@@ -311,6 +311,11 @@
     }
 
     async function submitSingleQuestion(questionId) {
+        if (!isFullScreenActive() || !isPageVisible()) {
+            alert('Security Violation: You must be in Full Screen mode to attempt answers.');
+            return;
+        }
+
         const optionsContainer = document.getElementById(`opts_${questionId}`);
         const selectedRadio = optionsContainer.querySelector('input[type="radio"]:checked');
         const submitBtn = document.getElementById(`btn_${questionId}`);

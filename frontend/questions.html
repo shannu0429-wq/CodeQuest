@@ -162,9 +162,12 @@
                         dateStr = question.created_at.substring(0, 10);
                     }
 
+                    const cleanTitle = data.quiz.title.replace(/\s+/g, '_');
+                    const customQuestionId = `#${cleanTitle}_${index + 1}`;
+
                     card.innerHTML = `
                         <div class="question-card-header">
-                            <span class="question-number-admin">Question ${index + 1}</span>
+                            <span class="question-number-admin">Question ${index + 1} (Custom ID: <strong>${customQuestionId}</strong>)</span>
                             <span class="question-id">ID: ${question.id} | Date: ${dateStr}</span>
                         </div>
                         <h3>${escapeHtml(question.question)}</h3>
