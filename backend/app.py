@@ -40,6 +40,18 @@ def get_db():
                 params = [p for p in query.split("&") if not p.startswith("pgbouncer=")]
                 database_url = base_uri + ("?" + "&".join(params) if params else "")
                 
+            # URL-encode the password if it contains an unencoded '@' character
+            if "://" in database_url:
+                scheme, rest = database_url.split("://", 1)
+                if "@" in rest:
+                    userinfo, hostinfo = rest.rsplit("@", 1)
+                    if ":" in userinfo:
+                        username, password = userinfo.split(":", 1)
+                        import urllib.parse
+                        password_decoded = urllib.parse.unquote(password)
+                        password_encoded = urllib.parse.quote(password_decoded)
+                        database_url = f"{scheme}://{username}:{password_encoded}@{hostinfo}"
+                
             db_connection = psycopg2.connect(database_url)
             print("PostgreSQL database connected successfully")
         except Exception as e:
