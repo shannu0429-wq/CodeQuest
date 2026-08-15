@@ -8,6 +8,14 @@
     <link rel="stylesheet" href="style.css">
     <script src="config.js"></script>
     <style>
+        /* Copy protection and selection prevention */
+        body {
+            -webkit-user-select: none !important;
+            -moz-user-select: none !important;
+            -ms-user-select: none !important;
+            user-select: none !important;
+        }
+
         /* Interactive options and results styling */
         .option.correct {
             background-color: #ebfbee !important;
@@ -100,6 +108,17 @@
         <a href="dashboard.html" style="color: white; text-decoration: none; font-weight: bold;">Dashboard</a>
         <a href="#" onclick="logout(); return false;" style="color: white; text-decoration: none; font-weight: bold;">Logout</a>
     </div>
+</div>
+
+<!-- Full Screen Prompt Modal -->
+<div id="fsModal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.94); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; color: white; padding: 20px; text-align: center; box-sizing: border-box;">
+    <h1 style="font-size: 28px; margin-bottom: 15px; color: #ffc9c9;">🔒 Anti-Cheat Mode Active</h1>
+    <p id="fsModalText" style="font-size: 16px; max-width: 500px; margin-bottom: 30px; line-height: 1.6;">
+        To attempt this quiz, you must enter Full Screen mode. If you exit full screen or switch tabs, you will get a warning. Exceeding 2 warnings or failing to return within 25 seconds will lock you out of the quiz.
+    </p>
+    <button id="fsModalBtn" onclick="enterFullScreenQuiz()" style="padding: 14px 28px; font-size: 16px; font-weight: bold; background-color: #2f9e44; color: white; border: none; border-radius: 6px; cursor: pointer; transition: background 0.2s;">
+        Enter Full Screen & Start
+    </button>
 </div>
 
 <div class="quiz-container">
@@ -444,6 +463,136 @@
             dropdown.style.display = 'none';
         }
     });
+
+    // -----------------------------------------------------
+    // Anti-Cheat & Copy Protection Implementation
+    // -----------------------------------------------------
+
+    // 1. Prevent Right-Click and Copy Shortcuts
+    document.addEventListener('contextmenu', e => e.preventDefault());
+    document.addEventListener('keydown', e => {
+        // Disable Ctrl+C, Ctrl+V, Ctrl+U (View Source)
+        if (e.ctrlKey && (e.key === 'c' || e.key === 'C' || e.key === 'v' || e.key === 'V' || e.key === 'u' || e.key === 'U')) {
+            e.preventDefault();
+        }
+        // Disable F12 and DevTools shortcuts
+        if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j'))) {
+            e.preventDefault();
+        }
+    });
+
+    // 2. Full Screen & Tab Switch Monitoring
+    let warningsCount = 0;
+    const maxWarnings = 2;
+    let penaltyTimer = null;
+    let secondsLeft = 25;
+    let isPenaltyTimerActive = false;
+
+    function enterFullScreenQuiz() {
+        const docEl = document.documentElement;
+        if (docEl.requestFullscreen) {
+            docEl.requestFullscreen();
+        } else if (docEl.mozRequestFullScreen) {
+            docEl.mozRequestFullScreen();
+        } else if (docEl.webkitRequestFullscreen) {
+            docEl.webkitRequestFullscreen();
+        } else if (docEl.msRequestFullscreen) {
+            docEl.msRequestFullscreen();
+        }
+    }
+
+    document.addEventListener('fullscreenchange', handleViolationEvent);
+    document.addEventListener('webkitfullscreenchange', handleViolationEvent);
+    document.addEventListener('mozfullscreenchange', handleViolationEvent);
+    document.addEventListener('MSFullscreenChange', handleViolationEvent);
+    document.addEventListener('visibilitychange', handleViolationEvent);
+
+    function isFullScreenActive() {
+        return !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+    }
+
+    function isPageVisible() {
+        return document.visibilityState === 'visible';
+    }
+
+    function handleViolationEvent() {
+        // Skip anti-cheat checking if all questions have already been completed
+        if (totalQuestionsCount > 0 && submittedAnswersCount === totalQuestionsCount) {
+            const fsModal = document.getElementById('fsModal');
+            if (fsModal) fsModal.style.display = 'none';
+            stopPenaltyTimer();
+            return;
+        }
+
+        const fsModal = document.getElementById('fsModal');
+        
+        if (isFullScreenActive() && isPageVisible()) {
+            // Student is in full screen and active tab
+            if (fsModal) fsModal.style.display = 'none';
+            stopPenaltyTimer();
+        } else {
+            // Student exited full screen or switched tab
+            if (fsModal) fsModal.style.display = 'flex';
+            triggerViolationWarning();
+        }
+    }
+
+    function triggerViolationWarning() {
+        if (isPenaltyTimerActive) return; // Warning timer is already counting down
+
+        warningsCount++;
+
+        if (warningsCount > maxWarnings) {
+            alert('Violation Limit Exceeded: You have been locked out of the quiz for anti-cheat violations.');
+            window.location.href = 'dashboard.html';
+            return;
+        }
+
+        startPenaltyTimer();
+    }
+
+    function startPenaltyTimer() {
+        isPenaltyTimerActive = true;
+        secondsLeft = 25;
+
+        const modalText = document.getElementById('fsModalText');
+        const modalBtn = document.getElementById('fsModalBtn');
+
+        modalBtn.textContent = 'Return to Full Screen';
+
+        penaltyTimer = setInterval(() => {
+            secondsLeft--;
+            modalText.innerHTML = `
+                <span style="color: #ff8787; font-weight: bold; font-size: 22px; display: block; margin-bottom: 15px;">⚠️ VIOLATION WARNING ${warningsCount} of 2</span>
+                You have exited full screen or switched tabs! You must click below to return to full screen within <strong>${secondsLeft} seconds</strong>, or you will be locked out.
+            `;
+
+            if (secondsLeft <= 0) {
+                clearInterval(penaltyTimer);
+                alert('Time Limit Exceeded: You have been locked out of this quiz.');
+                window.location.href = 'dashboard.html';
+            }
+        }, 1000);
+    }
+
+    function stopPenaltyTimer() {
+        if (penaltyTimer) {
+            clearInterval(penaltyTimer);
+            penaltyTimer = null;
+        }
+        isPenaltyTimerActive = false;
+
+        const modalText = document.getElementById('fsModalText');
+        const modalBtn = document.getElementById('fsModalBtn');
+        if (modalText) {
+            modalText.innerHTML = `
+                To attempt this quiz, you must enter Full Screen mode. If you exit full screen or switch tabs, you will get a warning. Exceeding 2 warnings or failing to return within 25 seconds will lock you out of the quiz.
+            `;
+        }
+        if (modalBtn) {
+            modalBtn.textContent = 'Enter Full Screen & Start';
+        }
+    }
 
     function escapeHtml(text) {
         if (!text) return '';
