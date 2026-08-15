@@ -2,7 +2,7 @@
 const API_BASE_URL = localStorage.getItem('api_base_url') || 
   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
     ? 'http://127.0.0.1:5000' 
-    : 'https://codequest-backend.onrender.com'); // REPLACE with your actual Render backend URL
+    : 'https://codequest-sozs.onrender.com');
 
 // Auth Helper
 function getAuthHeaders() {

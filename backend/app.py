@@ -32,7 +32,7 @@ def get_db():
             # Supabase / PostgreSQL connection string
             database_url = os.environ.get(
                 "DATABASE_URL", 
-                "postgresql://postgres.ywbfdhcllimmargcjvds:Shanmukha%40429@aws-0-ap-southeast-2.pooler.supabase.com:6543/postgres?pgbouncer=true"
+                "postgresql://postgres.ywbfdhcllimmargcjvds:Shanmukha%40429@aws-0-ap-southeast-2.pooler.supabase.com:6543/postgres"
             )
             db_connection = psycopg2.connect(database_url)
             print("PostgreSQL database connected successfully")
