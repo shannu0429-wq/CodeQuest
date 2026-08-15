@@ -111,7 +111,7 @@
 </div>
 
 <!-- Full Screen Prompt Modal -->
-<div id="fsModal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.94); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; color: white; padding: 20px; text-align: center; box-sizing: border-box;">
+<div id="fsModal" style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.94); display: none; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; color: white; padding: 20px; text-align: center; box-sizing: border-box;">
     <h1 style="font-size: 28px; margin-bottom: 15px; color: #ffc9c9;">🔒 Anti-Cheat Mode Active</h1>
     <p id="fsModalText" style="font-size: 16px; max-width: 500px; margin-bottom: 30px; line-height: 1.6;">
         To attempt this quiz, you must enter Full Screen mode. If you exit full screen or switch tabs, you will get a warning. Exceeding 2 warnings or failing to return within 25 seconds will lock you out of the quiz.
@@ -157,6 +157,10 @@
         loadNotifications();
     }
 
+    let totalQuestionsCount = 0;
+    let submittedAnswersCount = 0;
+    let hasStartedAttempt = false;
+
     async function loadQuiz() {
         try {
             const response = await fetch(`${API_BASE_URL}/api/quiz/${quizId}`, {
@@ -179,6 +183,9 @@
 
             const questionsContainer = document.getElementById('questionsContainer');
             questionsContainer.innerHTML = '';
+
+            totalQuestionsCount = data.questions ? data.questions.length : 0;
+            submittedAnswersCount = 0;
 
             if (data.questions && data.questions.length > 0) {
                 document.getElementById('quizForm').style.display = 'block';
@@ -210,6 +217,7 @@
                     let userAns = null;
                     if (hasAnswered) {
                         userAns = data.answers[question.id].user_answer;
+                        submittedAnswersCount++;
                     }
 
                     // Options highlighting helper
@@ -260,6 +268,83 @@
                         actionHtml = `<span style="font-weight: bold; color: #2f9e44; font-size: 14px; display: inline-block; margin-top: 10px;">Submitted ✓</span>`;
                     }
 
+                    // Build question contents: answered is always shown normally; unanswered is toggled dynamically.
+                    let attemptContentHtml = '';
+                    if (hasAnswered) {
+                        attemptContentHtml = `
+                            <div class="options" id="opts_${question.id}">
+                                <label class="option ${getOptionClass('A')}" id="lbl_${question.id}_A">
+                                    <input type="radio" name="question_${question.id}" value="A" ${getCheckedAttr('A')} ${disabledAttr} required>
+                                    <span class="option-letter">A</span>
+                                    <span class="option-text">${escapeHtml(question.option_a)}</span>
+                                </label>
+                                <label class="option ${getOptionClass('B')}" id="lbl_${question.id}_B">
+                                    <input type="radio" name="question_${question.id}" value="B" ${getCheckedAttr('B')} ${disabledAttr}>
+                                    <span class="option-letter">B</span>
+                                    <span class="option-text">${escapeHtml(question.option_b)}</span>
+                                </label>
+                                <label class="option ${getOptionClass('C')}" id="lbl_${question.id}_C">
+                                    <input type="radio" name="question_${question.id}" value="C" ${getCheckedAttr('C')} ${disabledAttr}>
+                                    <span class="option-letter">C</span>
+                                    <span class="option-text">${escapeHtml(question.option_c)}</span>
+                                </label>
+                                <label class="option ${getOptionClass('D')}" id="lbl_${question.id}_D">
+                                    <input type="radio" name="question_${question.id}" value="D" ${getCheckedAttr('D')} ${disabledAttr}>
+                                    <span class="option-letter">D</span>
+                                    <span class="option-text">${escapeHtml(question.option_d)}</span>
+                                </label>
+                            </div>
+                            <div id="sol_container_${question.id}">
+                                ${solutionHtml}
+                            </div>
+                            <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                                ${actionHtml}
+                                <div style="text-align: right;">
+                                    ${detailsAccordionHtml}
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        // Unanswered: hidden content + visible placeholder (unless full screen)
+                        const isFS = isFullScreenActive() && isPageVisible();
+                        attemptContentHtml = `
+                            <div class="fullscreen-placeholder" style="display: ${isFS ? 'none' : 'block'}; padding: 25px; text-align: center; border: 1px dashed #dee2e6; border-radius: 6px; background-color: #f8f9fa; font-weight: bold; margin-top: 15px; color: #868e96; font-size: 14px;">
+                                🔒 Please enter Full Screen mode to attempt this question.
+                            </div>
+                            <div class="unanswered-question-content" style="display: ${isFS ? 'block' : 'none'};">
+                                <div class="options" id="opts_${question.id}">
+                                    <label class="option" id="lbl_${question.id}_A">
+                                        <input type="radio" name="question_${question.id}" value="A" required>
+                                        <span class="option-letter">A</span>
+                                        <span class="option-text">${escapeHtml(question.option_a)}</span>
+                                    </label>
+                                    <label class="option" id="lbl_${question.id}_B">
+                                        <input type="radio" name="question_${question.id}" value="B">
+                                        <span class="option-letter">B</span>
+                                        <span class="option-text">${escapeHtml(question.option_b)}</span>
+                                    </label>
+                                    <label class="option" id="lbl_${question.id}_C">
+                                        <input type="radio" name="question_${question.id}" value="C">
+                                        <span class="option-letter">C</span>
+                                        <span class="option-text">${escapeHtml(question.option_c)}</span>
+                                    </label>
+                                    <label class="option" id="lbl_${question.id}_D">
+                                        <input type="radio" name="question_${question.id}" value="D">
+                                        <span class="option-letter">D</span>
+                                        <span class="option-text">${escapeHtml(question.option_d)}</span>
+                                    </label>
+                                </div>
+                                <div id="sol_container_${question.id}"></div>
+                                <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                                    ${actionHtml}
+                                    <div style="text-align: right;">
+                                        ${detailsAccordionHtml}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+
                     questionCard.innerHTML = `
                         <div class="question-top">
                             <span class="question-number">Question ${idx} (Custom ID: <strong>${customQuestionId}</strong>)</span>
@@ -267,40 +352,28 @@
                         </div>
                         <h2>${escapeHtml(question.question)}</h2>
                         ${codeHtml}
-                        <div class="options" id="opts_${question.id}">
-                            <label class="option ${getOptionClass('A')}" id="lbl_${question.id}_A">
-                                <input type="radio" name="question_${question.id}" value="A" ${getCheckedAttr('A')} ${disabledAttr} required>
-                                <span class="option-letter">A</span>
-                                <span class="option-text">${escapeHtml(question.option_a)}</span>
-                            </label>
-                            <label class="option ${getOptionClass('B')}" id="lbl_${question.id}_B">
-                                <input type="radio" name="question_${question.id}" value="B" ${getCheckedAttr('B')} ${disabledAttr}>
-                                <span class="option-letter">B</span>
-                                <span class="option-text">${escapeHtml(question.option_b)}</span>
-                            </label>
-                            <label class="option ${getOptionClass('C')}" id="lbl_${question.id}_C">
-                                <input type="radio" name="question_${question.id}" value="C" ${getCheckedAttr('C')} ${disabledAttr}>
-                                <span class="option-letter">C</span>
-                                <span class="option-text">${escapeHtml(question.option_c)}</span>
-                            </label>
-                            <label class="option ${getOptionClass('D')}" id="lbl_${question.id}_D">
-                                <input type="radio" name="question_${question.id}" value="D" ${getCheckedAttr('D')} ${disabledAttr}>
-                                <span class="option-letter">D</span>
-                                <span class="option-text">${escapeHtml(question.option_d)}</span>
-                            </label>
-                        </div>
-                        <div id="sol_container_${question.id}">
-                            ${solutionHtml}
-                        </div>
-                        <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                            ${actionHtml}
-                            <div style="text-align: right;">
-                                ${detailsAccordionHtml}
-                            </div>
-                        </div>
+                        ${attemptContentHtml}
                     `;
                     questionsContainer.appendChild(questionCard);
                 });
+
+                // Render top banner if there are unanswered questions
+                const existingBanner = document.getElementById('startExamBanner');
+                if (existingBanner) existingBanner.remove();
+
+                if (submittedAnswersCount < totalQuestionsCount) {
+                    const banner = document.createElement('div');
+                    banner.id = 'startExamBanner';
+                    banner.style = "background-color: #ffe3e3; color: #c92a2a; padding: 15px; border-radius: 8px; font-weight: bold; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #ffa8a8; flex-wrap: wrap; gap: 10px;";
+                    banner.innerHTML = `
+                        <span>📝 You have unanswered questions. To attempt them, you must enter Full Screen mode.</span>
+                        <button id="startAttemptBtn" onclick="startQuizAttemptFlow()" style="padding: 8px 16px; background-color: #e03131; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; transition: background 0.2s;">
+                            🚀 Enter Full Screen to Attempt
+                        </button>
+                    `;
+                    const form = document.getElementById('quizForm');
+                    form.parentNode.insertBefore(banner, form);
+                }
             } else {
                 document.getElementById('noQuestionsCard').style.display = 'block';
             }
@@ -520,6 +593,23 @@
         return document.visibilityState === 'visible';
     }
 
+    async function startQuizAttemptFlow() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/quiz/${quizId}/start-attempt`, {
+                method: 'POST',
+                headers: getAuthHeaders()
+            });
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.error || 'Failed to initialize attempt');
+            }
+            hasStartedAttempt = true;
+            enterFullScreenQuiz();
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
     function handleViolationEvent() {
         // Skip anti-cheat checking if all questions have already been completed
         if (totalQuestionsCount > 0 && submittedAnswersCount === totalQuestionsCount) {
@@ -529,16 +619,34 @@
             return;
         }
 
-        const fsModal = document.getElementById('fsModal');
-        
-        if (isFullScreenActive() && isPageVisible()) {
-            // Student is in full screen and active tab
+        const isFS = isFullScreenActive();
+        const isVis = isPageVisible();
+
+        const banner = document.getElementById('startExamBanner');
+        const placeholders = document.querySelectorAll('.fullscreen-placeholder');
+        const contents = document.querySelectorAll('.unanswered-question-content');
+
+        if (isFS && isVis) {
+            // Full Screen and Active: Hide placeholders, reveal unanswered questions, hide banner
+            if (banner) banner.style.display = 'none';
+            placeholders.forEach(el => el.style.display = 'none');
+            contents.forEach(el => el.style.display = 'block');
+            
+            const fsModal = document.getElementById('fsModal');
             if (fsModal) fsModal.style.display = 'none';
             stopPenaltyTimer();
         } else {
-            // Student exited full screen or switched tab
-            if (fsModal) fsModal.style.display = 'flex';
-            triggerViolationWarning();
+            // Out of Full Screen or Inactive: Hide unanswered questions, show placeholders, show banner
+            if (banner) banner.style.display = 'flex';
+            placeholders.forEach(el => el.style.display = 'block');
+            contents.forEach(el => el.style.display = 'none');
+
+            // Only trigger warning modal if they have started full screen at least once!
+            if (hasStartedAttempt) {
+                const fsModal = document.getElementById('fsModal');
+                if (fsModal) fsModal.style.display = 'flex';
+                triggerViolationWarning();
+            }
         }
     }
 

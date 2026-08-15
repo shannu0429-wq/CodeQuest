@@ -533,6 +533,40 @@ def quiz(quiz_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/quiz/<int:quiz_id>/start-attempt", methods=["POST"])
+def start_quiz_attempt(quiz_id):
+    user_id, role = get_auth()
+    if not user_id:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    try:
+        db = get_db()
+        cursor = db.cursor(cursor_factory=RealDictCursor)
+
+        # Check if quiz exists
+        cursor.execute("SELECT * FROM quizzes WHERE id = %s", (quiz_id,))
+        quiz = cursor.fetchone()
+        if not quiz:
+            cursor.close()
+            return jsonify({"error": "Quiz not found"}), 404
+
+        # Check if attempt already exists
+        cursor.execute("SELECT * FROM attempts WHERE user_id = %s AND quiz_id = %s", (user_id, quiz_id))
+        attempt = cursor.fetchone()
+
+        if not attempt:
+            # Create attempt with 0 count
+            cursor.execute("""
+                INSERT INTO attempts (user_id, quiz_id, questions_attempted, correct_answers, final_score)
+                VALUES (%s, %s, 0, 0, 0)
+            """, (user_id, quiz_id))
+            db.commit()
+
+        cursor.close()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/api/quiz/<int:quiz_id>/submit-single", methods=["POST"])
 def submit_single(quiz_id):
     user_id, role = get_auth()
