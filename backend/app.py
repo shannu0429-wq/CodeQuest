@@ -32,7 +32,7 @@ def get_db():
             # Supabase / PostgreSQL connection string
             database_url = os.environ.get(
                 "DATABASE_URL", 
-                "postgresql://postgres.ywbfdhcllimmargcjvds:Shanmukha%40429@aws-0-ap-southeast-2.pooler.supabase.com:6543/postgres"
+                "postgresql://postgres.ywbfdhcllimmargcjvds:Shanmukha0429@aws-0-ap-southeast-2.pooler.supabase.com:6543/postgres"
             )
             # Clean up pgbouncer query parameter as it crashes psycopg2 connection parser
             if "?" in database_url:
