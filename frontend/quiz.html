@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeQuest - Quiz</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="stylesheet" href="style.css">
+    <script src="config.js"></script>
+</head>
+<body>
+
+<!-- Navbar -->
+<div class="navbar">
+    <h2>CodeQuest 💻</h2>
+    <div>
+        <a href="dashboard.html">Dashboard</a>
+        <a href="#" onclick="logout(); return false;">Logout</a>
+    </div>
+</div>
+
+<div class="quiz-container">
+    <!-- Quiz Header -->
+    <div class="quiz-header" id="quizHeader">
+        <div>
+            <h1 id="quizTitle">Loading Quiz...</h1>
+            <p id="quizDescription"></p>
+        </div>
+        <div class="quiz-badge">🧠 Quiz</div>
+    </div>
+
+    <form id="quizForm" style="display: none;">
+        <!-- Questions container -->
+        <div id="questionsContainer"></div>
+
+        <!-- Submit -->
+        <div class="submit-section">
+            <p>Make sure you have answered all questions.</p>
+            <button type="submit" class="submit-quiz-btn">
+                🚀 Submit Quiz
+            </button>
+        </div>
+    </form>
+
+    <div class="empty-card" id="noQuestionsCard" style="display: none;">
+        <h2>📭 No Questions Available</h2>
+        <p>The administrator has not added questions to this quiz yet.</p>
+        <br>
+        <a href="dashboard.html" class="btn">Back to Dashboard</a>
+    </div>
+</div>
+
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const quizId = urlParams.get('id');
+
+    if (!quizId) {
+        window.location.href = 'dashboard.html';
+    }
+
+    if (checkAuth('user')) {
+        loadQuiz();
+    }
+
+    async function loadQuiz() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/quiz/${quizId}`, {
+                headers: getAuthHeaders()
+            });
+
+            if (!response.ok) {
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
+                throw new Error('Failed to load quiz');
+            }
+
+            const data = await response.json();
+
+            if (data.attempted) {
+                // Redirect to already attempted page
+                window.location.href = `already_attempted.html?id=${quizId}&score=${data.attempt.final_score}`;
+                return;
+            }
+
+            // Render Header
+            document.getElementById('quizTitle').textContent = data.quiz.title;
+            document.getElementById('quizDescription').textContent = data.quiz.description || '';
+
+            const questionsContainer = document.getElementById('questionsContainer');
+            questionsContainer.innerHTML = '';
+
+            if (data.questions && data.questions.length > 0) {
+                document.getElementById('quizForm').style.display = 'block';
+
+                data.questions.forEach((question, index) => {
+                    const idx = index + 1;
+                    const questionCard = document.createElement('div');
+                    questionCard.className = 'quiz-question-card';
+
+                    let codeHtml = '';
+                    if (question.code) {
+                        codeHtml = `
+                            <div class="code-container">
+                                <div class="code-header">
+                                    <span>💻 Code</span>
+                                </div>
+                                <pre><code>${escapeHtml(question.code)}</code></pre>
+                            </div>
+                        `;
+                    }
+
+                    questionCard.innerHTML = `
+                        <div class="question-top">
+                            <span class="question-number">Question ${idx}</span>
+                            <span class="question-count">${idx} / ${data.questions.length}</span>
+                        </div>
+                        <h2>${escapeHtml(question.question)}</h2>
+                        ${codeHtml}
+                        <div class="options">
+                            <label class="option">
+                                <input type="radio" name="question_${question.id}" value="A" required>
+                                <span class="option-letter">A</span>
+                                <span class="option-text">${escapeHtml(question.option_a)}</span>
+                            </label>
+                            <label class="option">
+                                <input type="radio" name="question_${question.id}" value="B">
+                                <span class="option-letter">B</span>
+                                <span class="option-text">${escapeHtml(question.option_b)}</span>
+                            </label>
+                            <label class="option">
+                                <input type="radio" name="question_${question.id}" value="C">
+                                <span class="option-letter">C</span>
+                                <span class="option-text">${escapeHtml(question.option_c)}</span>
+                            </label>
+                            <label class="option">
+                                <input type="radio" name="question_${question.id}" value="D">
+                                <span class="option-letter">D</span>
+                                <span class="option-text">${escapeHtml(question.option_d)}</span>
+                            </label>
+                        </div>
+                    `;
+                    questionsContainer.appendChild(questionCard);
+                });
+            } else {
+                document.getElementById('noQuestionsCard').style.display = 'block';
+            }
+        } catch (err) {
+            document.getElementById('quizTitle').textContent = 'Error loading quiz';
+            document.getElementById('quizDescription').textContent = err.message;
+        }
+    }
+
+    document.getElementById('quizForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const form = document.getElementById('quizForm');
+        const formData = new FormData(form);
+        const answers = {};
+
+        for (const [key, value] of formData.entries()) {
+            if (key.startsWith('question_')) {
+                const questionId = key.replace('question_', '');
+                answers[questionId] = value;
+            }
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/quiz/${quizId}/submit`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({ answers })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to submit quiz');
+            }
+
+            // Redirect to result page
+            window.location.href = `result.html?id=${quizId}&score=${data.score}&total=${data.total_questions}`;
+        } catch (err) {
+            alert(err.message);
+        }
+    });
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+</script>
+</body>
+</html>

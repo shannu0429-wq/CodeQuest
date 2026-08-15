@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeQuest - Result</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="stylesheet" href="style.css">
+    <script src="config.js"></script>
+</head>
+<body>
+
+<div class="navbar">
+    <h2>CodeQuest</h2>
+</div>
+
+<div class="result">
+    <h1>🎉 Quiz Completed!</h1>
+    <h2 id="quizTitle">Loading...</h2>
+    <p>Your Score</p>
+    <div class="score" id="scoreDisplay">0 / 0</div>
+
+    <div id="feedbackSection">
+        <!-- Will show feedback text based on score -->
+    </div>
+
+    <br>
+    <a class="btn" href="dashboard.html">
+        Back to Dashboard
+    </a>
+</div>
+
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const quizId = urlParams.get('id');
+    const score = parseInt(urlParams.get('score') || '0', 10);
+    const total = parseInt(urlParams.get('total') || '0', 10);
+
+    if (checkAuth('user')) {
+        loadResultDetails();
+    }
+
+    async function loadResultDetails() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/quiz/${quizId}`, {
+                headers: getAuthHeaders()
+            });
+            const data = await response.json();
+            
+            document.getElementById('quizTitle').textContent = data.quiz.title;
+        } catch (err) {
+            document.getElementById('quizTitle').textContent = "Quiz Result";
+        }
+
+        document.getElementById('scoreDisplay').textContent = `${score} / ${total}`;
+
+        const feedback = document.getElementById('feedbackSection');
+        if (score === total && total > 0) {
+            feedback.innerHTML = `
+                <h3>🏆 Excellent!</h3>
+                <p>You got every question correct!</p>
+            `;
+        } else if (score > 0) {
+            feedback.innerHTML = `
+                <h3>👍 Good Job!</h3>
+                <p>Keep practicing to improve your score.</p>
+            `;
+        } else {
+            feedback.innerHTML = `
+                <h3>💪 Keep Practicing!</h3>
+                <p>Don't give up. Try another quiz!</p>
+            `;
+        }
+    }
+</script>
+</body>
+</html>

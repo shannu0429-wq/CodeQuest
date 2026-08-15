@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeQuest - Login</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="stylesheet" href="style.css">
+    <script src="config.js"></script>
+</head>
+
+<body class="login-page">
+
+<div class="login-container">
+    <div class="login-card">
+        <h1>CodeQuest 💻</h1>
+        <p class="login-subtitle">
+            Test your coding skills and build your streak 🔥
+        </p>
+        <h2>Welcome Back!</h2>
+
+        <div id="errorAlert" class="alert alert-error" style="display: none;">
+            <span class="alert-icon">❌</span>
+            <div>
+                <strong>Login Failed</strong>
+                <p id="errorMessage"></p>
+            </div>
+        </div>
+
+        <form id="loginForm">
+            <label>Username</label>
+            <input
+                type="text"
+                id="username"
+                placeholder="Enter your username"
+                required
+            >
+            <br>
+
+            <label>Password</label>
+            <input
+                type="password"
+                id="password"
+                placeholder="Enter your password"
+                required
+            >
+            <br>
+
+            <button type="submit">
+                Login
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Redirect if already logged in
+    if (localStorage.getItem('user_id')) {
+        const role = localStorage.getItem('role');
+        if (role === 'admin') {
+            window.location.href = 'admin.html';
+        } else {
+            window.location.href = 'dashboard.html';
+        }
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const usernameInput = document.getElementById('username').value;
+        const passwordInput = document.getElementById('password').value;
+        const errorAlert = document.getElementById('errorAlert');
+        const errorMessage = document.getElementById('errorMessage');
+
+        errorAlert.style.display = 'none';
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    username: usernameInput,
+                    password: passwordInput
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Login failed. Please try again.');
+            }
+
+            // Save to localStorage
+            localStorage.setItem('user_id', data.user_id);
+            localStorage.setItem('username', data.username);
+            localStorage.setItem('role', data.role);
+
+            // Redirect
+            if (data.role === 'admin') {
+                window.location.href = 'admin.html';
+            } else {
+                window.location.href = 'dashboard.html';
+            }
+        } catch (err) {
+            errorMessage.textContent = err.message;
+            errorAlert.style.display = 'flex';
+        }
+    });
+</script>
+</body>
+</html>

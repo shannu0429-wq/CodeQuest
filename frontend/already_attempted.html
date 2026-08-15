@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeQuest - Quiz Already Attempted</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="stylesheet" href="style.css">
+    <script src="config.js"></script>
+</head>
+<body>
+
+<div class="navbar">
+    <h2>CodeQuest 💻</h2>
+    <div>
+        <a href="dashboard.html">Dashboard</a>
+        <a href="#" onclick="logout(); return false;">Logout</a>
+    </div>
+</div>
+
+<div class="attempted-page">
+    <div class="attempted-card">
+        <div class="big-check">✓</div>
+        <h1>Quiz Already Attempted</h1>
+        <p class="attempted-message" id="quizTitle">
+            Loading quiz status...
+        </p>
+        <p class="attempted-submessage">
+            Each quiz can only be attempted once.
+        </p>
+
+        <div class="previous-score">
+            <span>⭐ Your Score</span>
+            <strong id="previousScoreDisplay">0</strong>
+        </div>
+
+        <div class="attempted-actions">
+            <a href="dashboard.html" class="dashboard-btn">
+                ← Back to Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const quizId = urlParams.get('id');
+    const score = urlParams.get('score') || '0';
+
+    if (checkAuth('user')) {
+        loadAttemptedDetails();
+    }
+
+    async function loadAttemptedDetails() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/quiz/${quizId}`, {
+                headers: getAuthHeaders()
+            });
+            const data = await response.json();
+            document.getElementById('quizTitle').textContent = `You have already attempted: ${data.quiz.title}`;
+            if (data.attempt) {
+                document.getElementById('previousScoreDisplay').textContent = data.attempt.final_score;
+            } else {
+                document.getElementById('previousScoreDisplay').textContent = score;
+            }
+        } catch (err) {
+            document.getElementById('quizTitle').textContent = "You have already attempted this quiz.";
+            document.getElementById('previousScoreDisplay').textContent = score;
+        }
+    }
+</script>
+</body>
+</html>

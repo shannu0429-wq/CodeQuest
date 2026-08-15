@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeQuest - Edit Question</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="stylesheet" href="style.css">
+    <script src="config.js"></script>
+    <style>
+        /* Simple layout padding for form container in edit page */
+        .edit-container {
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        form label {
+            display: block;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+        form input[type="text"], form textarea, form select {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        form button {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        form button:hover {
+            background: #0056b3;
+        }
+        .back-link {
+            display: inline-block;
+            margin-top: 15px;
+            color: #007bff;
+            text-decoration: none;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+<div class="navbar">
+    <h2>CodeQuest 👑</h2>
+    <div>
+        <a href="admin.html">Admin Dashboard</a>
+        <a href="#" onclick="logout(); return false;">Logout</a>
+    </div>
+</div>
+
+<div class="edit-container">
+    <h1>Edit Question</h1>
+    
+    <form id="editQuestionForm">
+        <label>Question:</label>
+        <textarea id="questionText" rows="4" required></textarea>
+
+        <label>Code:</label>
+        <textarea id="questionCode" rows="8"></textarea>
+
+        <label>Option A:</label>
+        <input type="text" id="optionA" required>
+
+        <label>Option B:</label>
+        <input type="text" id="optionB" required>
+
+        <label>Option C:</label>
+        <input type="text" id="optionC" required>
+
+        <label>Option D:</label>
+        <input type="text" id="optionD" required>
+
+        <label>Correct Answer:</label>
+        <select id="correctAnswer" required>
+            <option value="A">A</option>
+            <option value="B">B</option>
+            <option value="C">C</option>
+            <option value="D">D</option>
+        </select>
+
+        <button type="submit">
+            Update Question
+        </button>
+    </form>
+    
+    <br>
+    <a href="#" id="backLink" class="back-link">Back to Questions</a>
+</div>
+
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const questionId = urlParams.get('id');
+    let quizId = null;
+
+    if (!questionId) {
+        window.location.href = 'admin.html';
+    }
+
+    if (checkAuth('admin')) {
+        loadQuestionDetails();
+    }
+
+    async function loadQuestionDetails() {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/admin/question/${questionId}`, {
+                headers: getAuthHeaders()
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch question details');
+            }
+
+            const data = await response.json();
+            const question = data.question;
+            quizId = question.quiz_id;
+
+            // Fill inputs
+            document.getElementById('questionText').value = question.question;
+            document.getElementById('questionCode').value = question.code || '';
+            document.getElementById('optionA').value = question.option_a;
+            document.getElementById('optionB').value = question.option_b;
+            document.getElementById('optionC').value = question.option_c;
+            document.getElementById('optionD').value = question.option_d;
+            document.getElementById('correctAnswer').value = question.correct_answer;
+
+            document.getElementById('backLink').href = `questions.html?id=${quizId}`;
+        } catch (err) {
+            alert(err.message);
+            window.location.href = 'admin.html';
+        }
+    }
+
+    document.getElementById('editQuestionForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+            question: document.getElementById('questionText').value,
+            code: document.getElementById('questionCode').value || null,
+            option_a: document.getElementById('optionA').value,
+            option_b: document.getElementById('optionB').value,
+            option_c: document.getElementById('optionC').value,
+            option_d: document.getElementById('optionD').value,
+            correct_answer: document.getElementById('correctAnswer').value
+        };
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/admin/question/${questionId}`, {
+                method: 'PUT',
+                headers: getAuthHeaders(),
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to update question');
+            }
+
+            window.location.href = `questions.html?id=${quizId}`;
+        } catch (err) {
+            alert(err.message);
+        }
+    });
+</script>
+</body>
+</html>

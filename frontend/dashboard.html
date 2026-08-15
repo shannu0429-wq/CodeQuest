@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeQuest - Dashboard</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="stylesheet" href="style.css">
+    <script src="config.js"></script>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<div class="navbar">
+    <h2>CodeQuest 💻</h2>
+    <div>
+        <a href="#" onclick="logout(); return false;">
+            Logout
+        </a>
+    </div>
+</div>
+
+<div class="container">
+    <!-- Welcome -->
+    <div class="welcome-section">
+        <h2>
+            Welcome, <span id="usernameSpan">Student</span> 👋
+        </h2>
+        <p>
+            Keep learning and improve your coding skills!
+        </p>
+    </div>
+
+    <!-- STATS -->
+    <div class="card-container">
+        <div class="card">
+            <h3>🔥 Current Streak</h3>
+            <div class="stat-number" id="currentStreak">0</div>
+            <p>days</p>
+        </div>
+
+        <div class="card">
+            <h3>🏆 Longest Streak</h3>
+            <div class="stat-number" id="longestStreak">0</div>
+            <p>days</p>
+        </div>
+
+        <div class="card">
+            <h3>⭐ Total Score</h3>
+            <div class="stat-number" id="totalScore">0</div>
+            <p>points</p>
+        </div>
+    </div>
+
+    <!-- QUIZZES -->
+    <h2 class="quiz-section-title">
+        Available Quizzes 📝
+    </h2>
+
+    <div class="dashboard-quizzes" id="quizzesContainer">
+        <!-- Quizzes will be loaded here dynamically -->
+        <div class="no-quizzes">
+            <p>Loading quizzes...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Validate auth
+    if (checkAuth('user')) {
+        document.getElementById('usernameSpan').textContent = localStorage.getItem('username');
+        loadDashboardData();
+    }
+
+    async function loadDashboardData() {
+        const quizzesContainer = document.getElementById('quizzesContainer');
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/dashboard`, {
+                headers: getAuthHeaders()
+            });
+
+            if (!response.ok) {
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
+                throw new Error('Failed to load dashboard data');
+            }
+
+            const data = await response.json();
+            
+            // Set stats
+            document.getElementById('currentStreak').textContent = data.user.current_streak;
+            document.getElementById('longestStreak').textContent = data.user.longest_streak;
+            document.getElementById('totalScore').textContent = data.total_score;
+
+            // Render quizzes
+            quizzesContainer.innerHTML = '';
+            
+            if (data.quizzes && data.quizzes.length > 0) {
+                data.quizzes.forEach(quiz => {
+                    const quizCard = document.createElement('div');
+                    quizCard.className = 'dashboard-quiz-card';
+                    
+                    let attemptSectionHtml = '';
+                    if (quiz.attempted) {
+                        attemptSectionHtml = `
+                            <div class="attempted-box">
+                                <div class="attempted-icon">✓</div>
+                                <div class="attempted-content">
+                                    <strong>Quiz Already Attempted</strong>
+                                    <p>You have already completed this quiz.</p>
+                                    <div class="score-display">
+                                        ⭐ Your Score: <strong>${quiz.score}</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        attemptSectionHtml = `
+                            <div class="available-box">
+                                <span>🟢 Available</span>
+                            </div>
+                            <a href="quiz.html?id=${quiz.id}" class="start-quiz-btn">
+                                🚀 Start Quiz
+                            </a>
+                        `;
+                    }
+
+                    quizCard.innerHTML = `
+                        <div class="quiz-card-icon">💻</div>
+                        <h2>${escapeHtml(quiz.title)}</h2>
+                        <p>${escapeHtml(quiz.description || '')}</p>
+                        ${attemptSectionHtml}
+                    `;
+                    quizzesContainer.appendChild(quizCard);
+                });
+            } else {
+                quizzesContainer.innerHTML = `
+                    <div class="no-quizzes">
+                        <div class="no-quiz-icon">📭</div>
+                        <h2>No Quizzes Available</h2>
+                        <p>Check back later for new quizzes.</p>
+                    </div>
+                `;
+            }
+        } catch (err) {
+            quizzesContainer.innerHTML = `
+                <div class="no-quizzes" style="border-color: red;">
+                    <h2>Error loading dashboard</h2>
+                    <p>${err.message}</p>
+                </div>
+            `;
+        }
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+</script>
+</body>
+</html>

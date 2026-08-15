@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeQuest - Manage Questions</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="stylesheet" href="style.css">
+    <script src="config.js"></script>
+</head>
+<body>
+
+<!-- Navbar -->
+<div class="navbar">
+    <h2>CodeQuest 👑</h2>
+    <div>
+        <a href="admin.html">Admin Dashboard</a>
+        <a href="#" onclick="logout(); return false;">Logout</a>
+    </div>
+</div>
+
+<div class="question-admin-container">
+    <!-- Quiz Header -->
+    <div class="question-admin-header">
+        <div>
+            <p class="admin-label">ADMIN / QUIZ MANAGEMENT</p>
+            <h1 id="quizTitle">Loading...</h1>
+            <p id="quizDescription"></p>
+        </div>
+        <div class="quiz-management-icon">📝</div>
+    </div>
+
+    <!-- Add Question -->
+    <div class="add-question-card">
+        <h2>➕ Add New Question</h2>
+        <p class="form-description">Create a multiple-choice question for this quiz.</p>
+
+        <form id="addQuestionForm">
+            <label>Question</label>
+            <textarea id="questionText" rows="3" placeholder="Enter your question..." required></textarea>
+
+            <label>Code <span class="optional">Optional</span></label>
+            <textarea id="questionCode" rows="7" placeholder="Enter code here if required..."></textarea>
+
+            <div class="options-grid">
+                <div>
+                    <label>Option A</label>
+                    <input type="text" id="optionA" placeholder="Enter option A" required>
+                </div>
+                <div>
+                    <label>Option B</label>
+                    <input type="text" id="optionB" placeholder="Enter option B" required>
+                </div>
+                <div>
+                    <label>Option C</label>
+                    <input type="text" id="optionC" placeholder="Enter option C" required>
+                </div>
+                <div>
+                    <label>Option D</label>
+                    <input type="text" id="optionD" placeholder="Enter option D" required>
+                </div>
+            </div>
+
+            <label>Correct Answer</label>
+            <select id="correctAnswer" required>
+                <option value="">Select correct answer</option>
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+                <option value="D">D</option>
+            </select>
+
+            <button type="submit" class="add-question-btn">
+                ➕ Add Question
+            </button>
+        </form>
+    </div>
+
+    <!-- Existing Questions -->
+    <div class="questions-title">
+        <div>
+            <h2>📚 Existing Questions</h2>
+            <p>Questions currently available in this quiz.</p>
+        </div>
+        <div class="question-count-badge" id="questionCountBadge">0 Questions</div>
+    </div>
+
+    <div id="questionsList">
+        <!-- Loaded dynamically -->
+        <p>Loading questions...</p>
+    </div>
+
+    <div class="back-admin">
+        <a href="admin.html">← Back to Admin Dashboard</a>
+    </div>
+</div>
+
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const quizId = urlParams.get('id');
+
+    if (!quizId) {
+        window.location.href = 'admin.html';
+    }
+
+    if (checkAuth('admin')) {
+        loadQuestionsData();
+    }
+
+    async function loadQuestionsData() {
+        const questionsList = document.getElementById('questionsList');
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/admin/quiz/${quizId}`, {
+                headers: getAuthHeaders()
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load questions data');
+            }
+
+            const data = await response.json();
+            
+            document.getElementById('quizTitle').textContent = data.quiz.title;
+            document.getElementById('quizDescription').textContent = data.quiz.description || '';
+            document.getElementById('questionCountBadge').textContent = `${data.questions.length} Questions`;
+
+            questionsList.innerHTML = '';
+
+            if (data.questions && data.questions.length > 0) {
+                data.questions.forEach((question, index) => {
+                    const card = document.createElement('div');
+                    card.className = 'question-admin-card';
+
+                    let codeHtml = '';
+                    if (question.code) {
+                        codeHtml = `
+                            <div class="admin-code-box">
+                                <div class="admin-code-header">💻 Code</div>
+                                <pre><code>${escapeHtml(question.code)}</code></pre>
+                            </div>
+                        `;
+                    }
+
+                    const optAClass = question.correct_answer === 'A' ? 'correct-option' : '';
+                    const optBClass = question.correct_answer === 'B' ? 'correct-option' : '';
+                    const optCClass = question.correct_answer === 'C' ? 'correct-option' : '';
+                    const optDClass = question.correct_answer === 'D' ? 'correct-option' : '';
+
+                    card.innerHTML = `
+                        <div class="question-card-header">
+                            <span class="question-number-admin">Question ${index + 1}</span>
+                            <span class="question-id">ID: ${question.id}</span>
+                        </div>
+                        <h3>${escapeHtml(question.question)}</h3>
+                        ${codeHtml}
+                        <div class="admin-options">
+                            <div class="admin-option ${optAClass}">
+                                <span>A</span>
+                                <p>${escapeHtml(question.option_a)}</p>
+                                ${question.correct_answer === 'A' ? '<strong>✓ Correct</strong>' : ''}
+                            </div>
+                            <div class="admin-option ${optBClass}">
+                                <span>B</span>
+                                <p>${escapeHtml(question.option_b)}</p>
+                                ${question.correct_answer === 'B' ? '<strong>✓ Correct</strong>' : ''}
+                            </div>
+                            <div class="admin-option ${optCClass}">
+                                <span>C</span>
+                                <p>${escapeHtml(question.option_c)}</p>
+                                ${question.correct_answer === 'C' ? '<strong>✓ Correct</strong>' : ''}
+                            </div>
+                            <div class="admin-option ${optDClass}">
+                                <span>D</span>
+                                <p>${escapeHtml(question.option_d)}</p>
+                                ${question.correct_answer === 'D' ? '<strong>✓ Correct</strong>' : ''}
+                            </div>
+                        </div>
+                        <div class="question-actions">
+                            <a href="edit_question.html?id=${question.id}" class="edit-question-btn">✏️ Edit</a>
+                            <button class="delete-question-btn" onclick="deleteQuestion(${question.id})">🗑️ Delete</button>
+                        </div>
+                    `;
+                    questionsList.appendChild(card);
+                });
+            } else {
+                questionsList.innerHTML = `
+                    <div class="no-questions">
+                        <div>📭</div>
+                        <h2>No Questions Yet</h2>
+                        <p>Add your first question using the form above.</p>
+                    </div>
+                `;
+            }
+        } catch (err) {
+            questionsList.innerHTML = `<p style="color: red;">Error: ${err.message}</p>`;
+        }
+    }
+
+    document.getElementById('addQuestionForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+            question: document.getElementById('questionText').value,
+            code: document.getElementById('questionCode').value || null,
+            option_a: document.getElementById('optionA').value,
+            option_b: document.getElementById('optionB').value,
+            option_c: document.getElementById('optionC').value,
+            option_d: document.getElementById('optionD').value,
+            correct_answer: document.getElementById('correctAnswer').value
+        };
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/admin/quiz/${quizId}/add-question`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to add question');
+            }
+
+            document.getElementById('addQuestionForm').reset();
+            loadQuestionsData();
+        } catch (err) {
+            alert(err.message);
+        }
+    });
+
+    async function deleteQuestion(questionId) {
+        if (!confirm('Delete this question?')) return;
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/admin/question/${questionId}/delete`, {
+                method: 'POST',
+                headers: getAuthHeaders()
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to delete question');
+            }
+
+            loadQuestionsData();
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+</script>
+</body>
+</html>
