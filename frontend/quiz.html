@@ -27,6 +27,10 @@
             border-color: #e03131 !important;
             color: #e03131 !important;
         }
+        .option.user-selected {
+            background-color: #e7f5ff !important;
+            border-color: #339af0 !important;
+        }
         .option.correct .option-letter {
             background-color: #2f9e44 !important;
             color: white !important;
@@ -34,6 +38,18 @@
         .option.incorrect .option-letter {
             background-color: #e03131 !important;
             color: white !important;
+        }
+        .option.user-selected .option-letter {
+            background-color: #339af0 !important;
+            color: white !important;
+        }
+        .status-pill {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-top: 10px;
         }
         .question-submit-btn {
             margin-top: 15px;
@@ -224,9 +240,34 @@
                     const getOptionClass = (optLetter) => {
                         if (!hasAnswered) return '';
                         const correctAns = question.correct_answer;
-                        if (!correctAns) return ''; // If answers are unreleased, don't color options
-                        if (optLetter === correctAns) return 'correct';
-                        if (userAns === optLetter && optLetter !== correctAns) return 'incorrect';
+                        if (correctAns) {
+                            if (optLetter === correctAns) return 'correct';
+                            if (userAns === optLetter && optLetter !== correctAns) return 'incorrect';
+                            return '';
+                        } else {
+                            if (userAns === optLetter) return 'user-selected';
+                            return '';
+                        }
+                    };
+
+                    const getOptionBadge = (optLetter) => {
+                        if (!hasAnswered) return '';
+                        const correctAns = question.correct_answer;
+                        if (correctAns) {
+                            if (userAns === optLetter && optLetter === correctAns) {
+                                return `<span style="margin-left: auto; background-color: #d3f9d8; color: #2b8a3e; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; white-space: nowrap;">✓ Your Choice (Correct)</span>`;
+                            }
+                            if (optLetter === correctAns) {
+                                return `<span style="margin-left: auto; background-color: #d3f9d8; color: #2b8a3e; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; white-space: nowrap;">✓ Correct Answer</span>`;
+                            }
+                            if (userAns === optLetter) {
+                                return `<span style="margin-left: auto; background-color: #ffe3e3; color: #c92a2a; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; white-space: nowrap;">✗ Your Choice (Incorrect)</span>`;
+                            }
+                        } else {
+                            if (userAns === optLetter) {
+                                return `<span style="margin-left: auto; background-color: #e7f5ff; color: #1971c2; padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; white-space: nowrap;">📍 Your Submitted Choice</span>`;
+                            }
+                        }
                         return '';
                     };
 
@@ -241,8 +282,8 @@
                     if (hasAnswered && (question.solution_text || question.solution_image)) {
                         solutionHtml = `
                             <div class="solution-box">
-                                <strong>💡 Solution:</strong>
-                                ${question.solution_text ? `<p style="margin: 5px 0 0 0;">${escapeHtml(question.solution_text)}</p>` : ''}
+                                <strong>💡 Solution & Explanation:</strong>
+                                ${question.solution_text ? `<p style="margin: 5px 0 0 0; line-height: 1.5;">${escapeHtml(question.solution_text)}</p>` : ''}
                                 ${question.solution_image ? `<img src="${escapeHtml(question.solution_image)}" style="max-width: 100%; margin-top: 10px; border-radius: 4px; display: block;">` : ''}
                             </div>
                         `;
@@ -257,6 +298,25 @@
                             <strong>Question ID:</strong> <code>${escapeHtml(customQuestionId)}</code>
                         </div>
                     `;
+
+                    // Answer Status Pill
+                    let answerStatusPillHtml = '';
+                    if (hasAnswered) {
+                        if (question.correct_answer) {
+                            const isRight = (userAns === question.correct_answer);
+                            answerStatusPillHtml = `
+                                <div class="status-pill" style="background: ${isRight ? '#ebfbee' : '#fff5f5'}; color: ${isRight ? '#2b8a3e' : '#c92a2a'}; border: 1px solid ${isRight ? '#b7ebc6' : '#ffc9c9'};">
+                                    Your Answer: <strong>Option ${userAns}</strong> | Correct: <strong>Option ${question.correct_answer}</strong> ${isRight ? '✓ (Correct)' : '✗ (Incorrect)'}
+                                </div>
+                            `;
+                        } else {
+                            answerStatusPillHtml = `
+                                <div class="status-pill" style="background: #e7f5ff; color: #1971c2; border: 1px solid #a5d8ff;">
+                                    Your Choice: <strong>Option ${userAns}</strong> (🔒 Correct answer and step-by-step solutions awaiting Admin release)
+                                </div>
+                            `;
+                        }
+                    }
 
                     let actionHtml = '';
                     if (!hasAnswered) {
@@ -280,22 +340,29 @@
                                     <input type="radio" name="question_${question.id}" value="A" ${getCheckedAttr('A')} ${disabledAttr} required>
                                     <span class="option-letter">A</span>
                                     <span class="option-text">${escapeHtml(question.option_a)}</span>
+                                    ${getOptionBadge('A')}
                                 </label>
                                 <label class="option ${getOptionClass('B')}" id="lbl_${question.id}_B">
                                     <input type="radio" name="question_${question.id}" value="B" ${getCheckedAttr('B')} ${disabledAttr}>
                                     <span class="option-letter">B</span>
                                     <span class="option-text">${escapeHtml(question.option_b)}</span>
+                                    ${getOptionBadge('B')}
                                 </label>
                                 <label class="option ${getOptionClass('C')}" id="lbl_${question.id}_C">
                                     <input type="radio" name="question_${question.id}" value="C" ${getCheckedAttr('C')} ${disabledAttr}>
                                     <span class="option-letter">C</span>
                                     <span class="option-text">${escapeHtml(question.option_c)}</span>
+                                    ${getOptionBadge('C')}
                                 </label>
                                 <label class="option ${getOptionClass('D')}" id="lbl_${question.id}_D">
                                     <input type="radio" name="question_${question.id}" value="D" ${getCheckedAttr('D')} ${disabledAttr}>
                                     <span class="option-letter">D</span>
                                     <span class="option-text">${escapeHtml(question.option_d)}</span>
+                                    ${getOptionBadge('D')}
                                 </label>
+                            </div>
+                            <div id="status_pill_container_${question.id}">
+                                ${answerStatusPillHtml}
                             </div>
                             <div id="sol_container_${question.id}">
                                 ${solutionHtml}
@@ -339,6 +406,7 @@
                                         <span class="option-text">${escapeHtml(question.option_d)}</span>
                                     </label>
                                 </div>
+                                <div id="status_pill_container_${question.id}"></div>
                                 <div id="sol_container_${question.id}"></div>
                                 <div style="margin-top: 15px;">
                                     ${actionHtml}
@@ -376,12 +444,28 @@
                         </button>
                     `;
                     form.parentNode.insertBefore(banner, form);
-                } else if (!data.quiz.show_answers) {
+                } else if (data.quiz.show_answers) {
                     const banner = document.createElement('div');
                     banner.id = 'startExamBanner';
-                    banner.style = "background-color: #e8f4fd; color: #1c7ed6; padding: 15px; border-radius: 8px; font-weight: bold; margin-bottom: 25px; border: 1px solid #a5d8ff; text-align: center;";
+                    banner.style = "background-color: #ebfbee; color: #2b8a3e; padding: 18px 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #b7ebc6; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;";
                     banner.innerHTML = `
-                        <span>🎉 Quiz Completed! Results and solutions will be available once released by the Administrator.</span>
+                        <div>
+                            <strong style="font-size: 16px; display: block; margin-bottom: 4px;">📖 Practice & Review Mode Active</strong>
+                            <span style="font-size: 14px; color: #2f9e44;">The Administrator has released the results. Review all questions, your choices, correct answers, and step-by-step explanations below for practice.</span>
+                        </div>
+                        <a href="dashboard.html" class="btn" style="background-color: #2f9e44; padding: 8px 16px; font-size: 13px; text-decoration: none; font-weight: bold;">← Back to Dashboard</a>
+                    `;
+                    form.parentNode.insertBefore(banner, form);
+                } else {
+                    const banner = document.createElement('div');
+                    banner.id = 'startExamBanner';
+                    banner.style = "background-color: #e8f4fd; color: #1971c2; padding: 18px 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #a5d8ff; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;";
+                    banner.innerHTML = `
+                        <div>
+                            <strong style="font-size: 16px; display: block; margin-bottom: 4px;">📝 Quiz Review Mode</strong>
+                            <span style="font-size: 14px; color: #1864ab;">You have completed this quiz! Your submitted choices are recorded below. Correct answers and step-by-step solutions are withheld and will become visible once released by the Administrator.</span>
+                        </div>
+                        <a href="dashboard.html" class="btn" style="background-color: #228be6; padding: 8px 16px; font-size: 13px; text-decoration: none; font-weight: bold;">← Back to Dashboard</a>
                     `;
                     form.parentNode.insertBefore(banner, form);
                 }
@@ -395,19 +479,22 @@
     }
 
     async function submitSingleQuestion(questionId) {
-        const fsModal = document.getElementById('fsModal');
-        if (fsModal && fsModal.style.display === 'flex') {
-            alert('Security Violation: You must be in Full Screen mode to attempt answers.');
-            return;
-        }
-
         const optionsContainer = document.getElementById(`opts_${questionId}`);
         const selectedRadio = optionsContainer.querySelector('input[type="radio"]:checked');
         const submitBtn = document.getElementById(`btn_${questionId}`);
 
+        const existingWarn = document.getElementById(`warn_${questionId}`);
         if (!selectedRadio) {
-            alert('Please select an option first.');
+            if (!existingWarn) {
+                const warn = document.createElement('div');
+                warn.id = `warn_${questionId}`;
+                warn.style = "color: #e03131; font-weight: bold; font-size: 13px; margin-top: 8px;";
+                warn.textContent = "⚠️ Please select an option first before submitting.";
+                submitBtn.parentNode.insertBefore(warn, submitBtn);
+            }
             return;
+        } else if (existingWarn) {
+            existingWarn.remove();
         }
 
         const selectedAnswer = selectedRadio.value;
@@ -416,6 +503,7 @@
         const radios = optionsContainer.querySelectorAll('input[type="radio"]');
         radios.forEach(r => r.disabled = true);
         submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
 
         try {
             const response = await fetch(`${API_BASE_URL}/api/quiz/${quizId}/submit-single`, {
@@ -448,16 +536,9 @@
                 if (placeholder) placeholder.remove();
             }
 
-            // If all questions are answered, remove top exam banner permanently
-            if (submittedAnswersCount === totalQuestionsCount) {
-                const banner = document.getElementById('startExamBanner');
-                if (banner) banner.remove();
-            }
-
             const correctOption = data.correct_answer;
 
             // Highlight selected and correct answers
-            // Highlight selected and correct answers (only if answers are released)
             if (correctOption) {
                 radios.forEach(radio => {
                     const label = document.getElementById(`lbl_${questionId}_${radio.value}`);
@@ -469,6 +550,30 @@
                         }
                     }
                 });
+
+                const isRight = (selectedAnswer === correctOption);
+                const statusPillContainer = document.getElementById(`status_pill_container_${questionId}`);
+                if (statusPillContainer) {
+                    statusPillContainer.innerHTML = `
+                        <div class="status-pill" style="background: ${isRight ? '#ebfbee' : '#fff5f5'}; color: ${isRight ? '#2b8a3e' : '#c92a2a'}; border: 1px solid ${isRight ? '#b7ebc6' : '#ffc9c9'};">
+                            Your Answer: <strong>Option ${selectedAnswer}</strong> | Correct: <strong>Option ${correctOption}</strong> ${isRight ? '✓ (Correct)' : '✗ (Incorrect)'}
+                        </div>
+                    `;
+                }
+            } else {
+                // Answers not released yet, highlight chosen answer with neutral active style
+                const label = document.getElementById(`lbl_${questionId}_${selectedAnswer}`);
+                if (label) {
+                    label.classList.add('user-selected');
+                }
+                const statusPillContainer = document.getElementById(`status_pill_container_${questionId}`);
+                if (statusPillContainer) {
+                    statusPillContainer.innerHTML = `
+                        <div class="status-pill" style="background: #e7f5ff; color: #1971c2; border: 1px solid #a5d8ff;">
+                            Your Choice: <strong>Option ${selectedAnswer}</strong> (🔒 Correct answer and step-by-step solutions awaiting Admin release)
+                        </div>
+                    `;
+                }
             }
 
             // Show solution if provided by admin
@@ -476,19 +581,59 @@
                 const solContainer = document.getElementById(`sol_container_${questionId}`);
                 solContainer.innerHTML = `
                     <div class="solution-box">
-                        <strong>💡 Solution:</strong>
-                        ${data.solution_text ? `<p style="margin: 5px 0 0 0;">${escapeHtml(data.solution_text)}</p>` : ''}
+                        <strong>💡 Solution & Explanation:</strong>
+                        ${data.solution_text ? `<p style="margin: 5px 0 0 0; line-height: 1.5;">${escapeHtml(data.solution_text)}</p>` : ''}
                         ${data.solution_image ? `<img src="${escapeHtml(data.solution_image)}" style="max-width: 100%; margin-top: 10px; border-radius: 4px; display: block;">` : ''}
                     </div>
                 `;
             }
 
             submitBtn.outerHTML = `<span style="font-weight: bold; color: #2f9e44; font-size: 14px; display: inline-block; margin-top: 10px;">Submitted ✓</span>`;
+
+            // If all questions are answered, update top banner to practice / review mode
+            if (submittedAnswersCount === totalQuestionsCount) {
+                hasStartedAttempt = false;
+                const existingBanner = document.getElementById('startExamBanner');
+                if (existingBanner) existingBanner.remove();
+
+                const fsModal = document.getElementById('fsModal');
+                if (fsModal) fsModal.style.display = 'none';
+                stopPenaltyTimer();
+
+                const form = document.getElementById('quizForm');
+                const banner = document.createElement('div');
+                banner.id = 'startExamBanner';
+                if (correctOption) {
+                    banner.style = "background-color: #ebfbee; color: #2b8a3e; padding: 18px 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #b7ebc6; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;";
+                    banner.innerHTML = `
+                        <div>
+                            <strong style="font-size: 16px; display: block; margin-bottom: 4px;">📖 Practice & Review Mode Active</strong>
+                            <span style="font-size: 14px; color: #2f9e44;">All questions answered! You can review every question, your choices, correct answers, and step-by-step explanations below for practice.</span>
+                        </div>
+                        <a href="dashboard.html" class="btn" style="background-color: #2f9e44; padding: 8px 16px; font-size: 13px; text-decoration: none; font-weight: bold;">← Back to Dashboard</a>
+                    `;
+                } else {
+                    banner.style = "background-color: #e8f4fd; color: #1971c2; padding: 18px 20px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #a5d8ff; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;";
+                    banner.innerHTML = `
+                        <div>
+                            <strong style="font-size: 16px; display: block; margin-bottom: 4px;">📝 Quiz Completed (Review Mode)</strong>
+                            <span style="font-size: 14px; color: #1864ab;">All questions completed! Your choices are saved. Solutions and correct answers will appear once released by the Administrator.</span>
+                        </div>
+                        <a href="dashboard.html" class="btn" style="background-color: #228be6; padding: 8px 16px; font-size: 13px; text-decoration: none; font-weight: bold;">← Back to Dashboard</a>
+                    `;
+                }
+                form.parentNode.insertBefore(banner, form);
+            }
         } catch (err) {
-            alert(err.message);
-            // Re-enable inputs if failed
+            submitBtn.textContent = 'Submit Answer';
             radios.forEach(r => r.disabled = false);
             submitBtn.disabled = false;
+            
+            const warn = document.createElement('div');
+            warn.id = `warn_${questionId}`;
+            warn.style = "color: #e03131; font-weight: bold; font-size: 13px; margin-top: 8px;";
+            warn.textContent = `❌ ${err.message}`;
+            submitBtn.parentNode.insertBefore(warn, submitBtn);
         }
     }
 
@@ -653,9 +798,17 @@
     function handleViolationEvent() {
         // Skip anti-cheat checking if all questions have already been completed
         if (totalQuestionsCount > 0 && submittedAnswersCount === totalQuestionsCount) {
+            hasStartedAttempt = false;
             const fsModal = document.getElementById('fsModal');
             if (fsModal) fsModal.style.display = 'none';
             stopPenaltyTimer();
+            const placeholders = document.querySelectorAll('.fullscreen-placeholder');
+            const contents = document.querySelectorAll('.unanswered-question-content');
+            placeholders.forEach(el => el.remove());
+            contents.forEach(el => {
+                el.classList.remove('unanswered-question-content');
+                el.style.display = 'block';
+            });
             return;
         }
 

@@ -150,14 +150,19 @@
                     let buttonHtml = '';
                     if (quiz.total_questions > 0 && quiz.questions_attempted === quiz.total_questions) {
                         buttonHtml = `
-                            <div style="margin-top: 10px; padding: 8px; background-color: #ebfbee; color: #2f9e44; border: 1px solid #b7ebc6; border-radius: 6px; text-align: center; font-weight: bold; font-size: 13px;">
-                                ✓ Completed
+                            <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+                                <a href="quiz.html?id=${quiz.id}" class="start-quiz-btn" style="text-align: center; display: block; background-color: #2b8a3e; color: white; text-decoration: none; font-weight: bold; padding: 10px; border-radius: 6px;">
+                                    📖 Practice & Review Quiz
+                                </a>
+                                <div style="padding: 6px 10px; background-color: #ebfbee; color: #2b8a3e; border: 1px solid #b7ebc6; border-radius: 6px; text-align: center; font-weight: bold; font-size: 12px;">
+                                    ✓ Completed (${quiz.correct_answers}/${quiz.total_questions} Score)
+                                </div>
                             </div>
                         `;
                     } else {
                         const btnText = quiz.questions_attempted > 0 ? '🚀 Continue Quiz' : '🚀 Start Quiz';
                         buttonHtml = `
-                            <a href="quiz.html?id=${quiz.id}" class="start-quiz-btn" style="text-align: center; display: block; margin-top: 10px;">
+                            <a href="quiz.html?id=${quiz.id}" class="start-quiz-btn" style="text-align: center; display: block; margin-top: 10px; text-decoration: none; font-weight: bold;">
                                 ${btnText}
                             </a>
                         `;

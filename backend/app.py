@@ -84,6 +84,12 @@ def before_request_func():
             print("Database migrations applied successfully!")
         except Exception as e:
             print("Database migrations failed:", e)
+            try:
+                db.rollback()
+                cursor.close()
+            except Exception:
+                pass
+            app._migrations_run = True
 
 # Helper function to get current user from headers
 def get_auth():
@@ -521,7 +527,15 @@ def quiz(quiz_id):
             (user_id, quiz_id)
         )
         answers = cursor.fetchall()
-        answered_map = {str(a["question_id"]): {"user_answer": a["user_answer"], "is_correct": a["is_correct"]} for a in answers}
+
+        show_answers = bool(quiz_data.get("show_answers", False))
+        answered_map = {}
+        for a in answers:
+            qid_key = str(a["question_id"])
+            answered_map[qid_key] = {
+                "user_answer": a["user_answer"],
+                "is_correct": a["is_correct"] if show_answers else None
+            }
 
         # Get questions
         cursor.execute(
@@ -530,7 +544,7 @@ def quiz(quiz_id):
         )
         questions = cursor.fetchall()
 
-        # Format times and hide solutions/answers for unanswered questions
+        # Format times and hide solutions/answers for unanswered questions or if show_answers is False
         for question in questions:
             if question.get("created_at"):
                 question["created_at"] = question["created_at"].strftime("%Y-%m-%d")
@@ -538,7 +552,7 @@ def quiz(quiz_id):
                 question["created_at"] = None
 
             qid_str = str(question["id"])
-            if qid_str not in answered_map or not quiz_data["show_answers"]:
+            if qid_str not in answered_map or not show_answers:
                 # Hide answer and solution from student to prevent cheating or before results release
                 question["correct_answer"] = None
                 question["solution_text"] = None

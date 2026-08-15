@@ -134,13 +134,25 @@
                 data.quizzes.forEach(quiz => {
                     const card = document.createElement('div');
                     card.className = 'admin-quiz-card';
+
+                    const isReleased = Boolean(quiz.show_answers);
+                    const releaseBadge = isReleased
+                        ? `<span style="background-color: #d3f9d8; color: #2b8a3e; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">🟢 Solutions Visible to Students</span>`
+                        : `<span style="background-color: #ffe3e3; color: #c92a2a; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">🔒 Solutions Hidden from Students</span>`;
+
                     card.innerHTML = `
                         <div class="quiz-icon">💻</div>
                         <h2>${escapeHtml(quiz.title)}</h2>
                         <p>${escapeHtml(quiz.description || '')}</p>
-                        <div style="margin: 12px 0; font-size: 13px; color: #495057; display: flex; align-items: center; justify-content: space-between; background-color: #f1f3f5; padding: 8px 12px; border-radius: 4px; border: 1px solid #e9ecef;">
-                            <span>🔓 Release Results & Solutions</span>
-                            <input type="checkbox" ${quiz.show_answers ? 'checked' : ''} onchange="toggleReleaseAnswers(${quiz.id}, this.checked)" style="width: 18px; height: 18px; cursor: pointer;">
+                        <div style="margin: 15px 0 10px; font-size: 13px; color: #495057; background-color: #f8f9fa; padding: 10px 14px; border-radius: 6px; border: 1px solid #e9ecef;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                                <span style="font-weight: bold; color: #343a40;">🔓 Release Results & Solutions</span>
+                                <input type="checkbox" id="toggle_${quiz.id}" ${isReleased ? 'checked' : ''} onchange="toggleReleaseAnswers(${quiz.id}, this.checked)" style="width: 18px; height: 18px; cursor: pointer; accent-color: #2f9e44;">
+                            </div>
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size: 12px; color: #868e96;">Status:</span>
+                                <span id="status_badge_${quiz.id}">${releaseBadge}</span>
+                            </div>
                         </div>
                         <div class="admin-actions">
                             <a class="btn edit-btn" href="questions.html?id=${quiz.id}">
@@ -214,6 +226,7 @@
     }
 
     async function toggleReleaseAnswers(quizId, isChecked) {
+        const badgeSpan = document.getElementById(`status_badge_${quizId}`);
         try {
             const response = await fetch(`${API_BASE_URL}/api/admin/quiz/${quizId}/toggle-answers`, {
                 method: 'POST',
@@ -224,6 +237,12 @@
             if (!response.ok) {
                 const data = await response.json();
                 throw new Error(data.error || 'Failed to toggle release answers');
+            }
+
+            if (badgeSpan) {
+                badgeSpan.innerHTML = isChecked 
+                    ? `<span style="background-color: #d3f9d8; color: #2b8a3e; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">🟢 Solutions Visible to Students</span>`
+                    : `<span style="background-color: #ffe3e3; color: #c92a2a; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">🔒 Solutions Hidden from Students</span>`;
             }
         } catch (err) {
             alert(err.message);
