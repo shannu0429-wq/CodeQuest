@@ -272,6 +272,8 @@
                     let attemptContentHtml = '';
                     if (hasAnswered) {
                         attemptContentHtml = `
+                            <h2>${escapeHtml(question.question)}</h2>
+                            ${codeHtml}
                             <div class="options" id="opts_${question.id}">
                                 <label class="option ${getOptionClass('A')}" id="lbl_${question.id}_A">
                                     <input type="radio" name="question_${question.id}" value="A" ${getCheckedAttr('A')} ${disabledAttr} required>
@@ -309,9 +311,11 @@
                         const isFS = isFullScreenActive() && isPageVisible();
                         attemptContentHtml = `
                             <div class="fullscreen-placeholder" style="display: ${isFS ? 'none' : 'block'}; padding: 25px; text-align: center; border: 1px dashed #dee2e6; border-radius: 6px; background-color: #f8f9fa; font-weight: bold; margin-top: 15px; color: #868e96; font-size: 14px;">
-                                🔒 Please enter Full Screen mode to attempt this question.
+                                🔒 Please enter Full Screen mode to view and attempt this question.
                             </div>
                             <div class="unanswered-question-content" style="display: ${isFS ? 'block' : 'none'};">
+                                <h2>${escapeHtml(question.question)}</h2>
+                                ${codeHtml}
                                 <div class="options" id="opts_${question.id}">
                                     <label class="option" id="lbl_${question.id}_A">
                                         <input type="radio" name="question_${question.id}" value="A" required>
@@ -335,12 +339,12 @@
                                     </label>
                                 </div>
                                 <div id="sol_container_${question.id}"></div>
-                                <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                                <div style="margin-top: 15px;">
                                     ${actionHtml}
-                                    <div style="text-align: right;">
-                                        ${detailsAccordionHtml}
-                                    </div>
                                 </div>
+                            </div>
+                            <div style="margin-top: 15px; text-align: right;">
+                                ${detailsAccordionHtml}
                             </div>
                         `;
                     }
@@ -350,8 +354,6 @@
                             <span class="question-number">Question ${idx} (Custom ID: <strong>${customQuestionId}</strong>)</span>
                             <span class="question-count">${idx} / ${data.questions.length}</span>
                         </div>
-                        <h2>${escapeHtml(question.question)}</h2>
-                        ${codeHtml}
                         ${attemptContentHtml}
                     `;
                     questionsContainer.appendChild(questionCard);
@@ -419,6 +421,27 @@
 
             if (!response.ok) {
                 throw new Error(data.error || 'Failed to submit answer');
+            }
+
+            // Increment answered counter
+            submittedAnswersCount++;
+
+            // Convert wrappers to make this question permanently visible (not restricted by full screen anymore)
+            const contentDiv = optionsContainer.closest('.unanswered-question-content');
+            if (contentDiv) {
+                contentDiv.classList.remove('unanswered-question-content');
+                contentDiv.style.display = 'block';
+            }
+            const card = document.getElementById(`card_${questionId}`);
+            if (card) {
+                const placeholder = card.querySelector('.fullscreen-placeholder');
+                if (placeholder) placeholder.remove();
+            }
+
+            // If all questions are answered, remove top exam banner permanently
+            if (submittedAnswersCount === totalQuestionsCount) {
+                const banner = document.getElementById('startExamBanner');
+                if (banner) banner.remove();
             }
 
             const correctOption = data.correct_answer;
