@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <title>CodeQuest - Manage Questions</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+
+</head>
+
+<body>
+
+<!-- Navbar -->
+
+<div class="navbar">
+
+    <h2>CodeQuest 👑</h2>
+
+    <div>
+        <a href="/admin">Admin Dashboard</a>
+        <a href="/logout">Logout</a>
+    </div>
+
+</div>
+
+
+<div class="question-admin-container">
+
+    <!-- Quiz Header -->
+
+    <div class="question-admin-header">
+
+        <div>
+
+            <p class="admin-label">
+                ADMIN / QUIZ MANAGEMENT
+            </p>
+
+            <h1>
+                {{ quiz["title"] }}
+            </h1>
+
+            <p>
+                {{ quiz["description"] }}
+            </p>
+
+        </div>
+
+        <div class="quiz-management-icon">
+            📝
+        </div>
+
+    </div>
+
+
+    <!-- Add Question -->
+
+    <div class="add-question-card">
+
+        <h2>➕ Add New Question</h2>
+
+        <p class="form-description">
+            Create a multiple-choice question for this quiz.
+        </p>
+
+
+        <form
+            method="post"
+            action="/admin/quiz/{{ quiz['id'] }}/add-question"
+        >
+
+            <label>
+                Question
+            </label>
+
+            <textarea
+                name="question"
+                rows="3"
+                placeholder="Enter your question..."
+                required
+            ></textarea>
+
+
+            <label>
+                Code
+                <span class="optional">
+                    Optional
+                </span>
+            </label>
+
+            <textarea
+                name="code"
+                rows="7"
+                placeholder="Enter code here if required..."
+            ></textarea>
+
+
+            <div class="options-grid">
+
+                <div>
+
+                    <label>
+                        Option A
+                    </label>
+
+                    <input
+                        type="text"
+                        name="option_a"
+                        placeholder="Enter option A"
+                        required
+                    >
+
+                </div>
+
+
+                <div>
+
+                    <label>
+                        Option B
+                    </label>
+
+                    <input
+                        type="text"
+                        name="option_b"
+                        placeholder="Enter option B"
+                        required
+                    >
+
+                </div>
+
+
+                <div>
+
+                    <label>
+                        Option C
+                    </label>
+
+                    <input
+                        type="text"
+                        name="option_c"
+                        placeholder="Enter option C"
+                        required
+                    >
+
+                </div>
+
+
+                <div>
+
+                    <label>
+                        Option D
+                    </label>
+
+                    <input
+                        type="text"
+                        name="option_d"
+                        placeholder="Enter option D"
+                        required
+                    >
+
+                </div>
+
+            </div>
+
+
+            <label>
+                Correct Answer
+            </label>
+
+            <select
+                name="correct_answer"
+                required
+            >
+
+                <option value="">
+                    Select correct answer
+                </option>
+
+                <option value="A">
+                    A
+                </option>
+
+                <option value="B">
+                    B
+                </option>
+
+                <option value="C">
+                    C
+                </option>
+
+                <option value="D">
+                    D
+                </option>
+
+            </select>
+
+
+            <button
+                type="submit"
+                class="add-question-btn"
+            >
+                ➕ Add Question
+            </button>
+
+        </form>
+
+    </div>
+
+
+    <!-- Existing Questions -->
+
+    <div class="questions-title">
+
+        <div>
+
+            <h2>📚 Existing Questions</h2>
+
+            <p>
+                Questions currently available in this quiz.
+            </p>
+
+        </div>
+
+        <div class="question-count-badge">
+
+            {{ questions|length }} Questions
+
+        </div>
+
+    </div>
+
+
+    {% if questions %}
+
+        {% for question in questions %}
+
+        <div class="question-admin-card">
+
+            <!-- Question header -->
+
+            <div class="question-card-header">
+
+                <span class="question-number-admin">
+                    Question {{ loop.index }}
+                </span>
+
+                <span class="question-id">
+                    ID: {{ question["id"] }}
+                </span>
+
+            </div>
+
+
+            <!-- Question -->
+
+            <h3>
+                {{ question["question"] }}
+            </h3>
+
+
+            <!-- Code -->
+
+            {% if question["code"] %}
+
+            <div class="admin-code-box">
+
+                <div class="admin-code-header">
+                    💻 Code
+                </div>
+
+                <pre><code>{{ question["code"] }}</code></pre>
+
+            </div>
+
+            {% endif %}
+
+
+            <!-- Options -->
+
+            <div class="admin-options">
+
+                <div
+                    class="admin-option
+                    {% if question['correct_answer'] == 'A' %}
+                    correct-option
+                    {% endif %}"
+                >
+
+                    <span>A</span>
+
+                    <p>
+                        {{ question["option_a"] }}
+                    </p>
+
+                    {% if question["correct_answer"] == "A" %}
+                        <strong>✓ Correct</strong>
+                    {% endif %}
+
+                </div>
+
+
+                <div
+                    class="admin-option
+                    {% if question['correct_answer'] == 'B' %}
+                    correct-option
+                    {% endif %}"
+                >
+
+                    <span>B</span>
+
+                    <p>
+                        {{ question["option_b"] }}
+                    </p>
+
+                    {% if question["correct_answer"] == "B" %}
+                        <strong>✓ Correct</strong>
+                    {% endif %}
+
+                </div>
+
+
+                <div
+                    class="admin-option
+                    {% if question['correct_answer'] == 'C' %}
+                    correct-option
+                    {% endif %}"
+                >
+
+                    <span>C</span>
+
+                    <p>
+                        {{ question["option_c"] }}
+                    </p>
+
+                    {% if question["correct_answer"] == "C" %}
+                        <strong>✓ Correct</strong>
+                    {% endif %}
+
+                </div>
+
+
+                <div
+                    class="admin-option
+                    {% if question['correct_answer'] == 'D' %}
+                    correct-option
+                    {% endif %}"
+                >
+
+                    <span>D</span>
+
+                    <p>
+                        {{ question["option_d"] }}
+                    </p>
+
+                    {% if question["correct_answer"] == "D" %}
+                        <strong>✓ Correct</strong>
+                    {% endif %}
+
+                </div>
+
+            </div>
+
+
+            <!-- Actions -->
+
+            <div class="question-actions">
+
+                <a
+                    href="/admin/question/{{ question['id'] }}/edit"
+                    class="edit-question-btn"
+                >
+                    ✏️ Edit
+                </a>
+
+
+                <form
+                    method="post"
+                    action="/admin/question/{{ question['id'] }}/delete"
+                    onsubmit="return confirm('Delete this question?');"
+                >
+
+                    <button
+                        type="submit"
+                        class="delete-question-btn"
+                    >
+                        🗑️ Delete
+                    </button>
+
+                </form>
+
+            </div>
+
+        </div>
+
+        {% endfor %}
+
+    {% else %}
+
+        <div class="no-questions">
+
+            <div>
+                📭
+            </div>
+
+            <h2>
+                No Questions Yet
+            </h2>
+
+            <p>
+                Add your first question using the form above.
+            </p>
+
+        </div>
+
+    {% endif %}
+
+
+    <div class="back-admin">
+
+        <a href="/admin">
+            ← Back to Admin Dashboard
+        </a>
+
+    </div>
+
+</div>
+
+</body>
+
+</html>

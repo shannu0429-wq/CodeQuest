@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <title>CodeQuest - Result</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+
+</head>
+
+<body>
+
+<div class="navbar">
+
+    <h2>CodeQuest</h2>
+
+</div>
+
+<div class="result">
+
+    <h1>🎉 Quiz Completed!</h1>
+
+    <h2>{{ quiz["title"] }}</h2>
+
+    <p>Your Score</p>
+
+    <div class="score">
+
+        {{ score }} / {{ total_questions }}
+
+    </div>
+
+    {% if score == total_questions %}
+
+        <h3>🏆 Excellent!</h3>
+
+        <p>You got every question correct!</p>
+
+    {% elif score > 0 %}
+
+        <h3>👍 Good Job!</h3>
+
+        <p>Keep practicing to improve your score.</p>
+
+    {% else %}
+
+        <h3>💪 Keep Practicing!</h3>
+
+        <p>Don't give up. Try another quiz!</p>
+
+    {% endif %}
+
+    <br>
+
+    <a
+        class="btn"
+        href="/dashboard"
+    >
+        Back to Dashboard
+    </a>
+
+</div>
+
+</body>
+
+</html>

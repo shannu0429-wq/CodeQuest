@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <title>CodeQuest - Admin Dashboard</title>
+<link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+</head>
+
+<body>
+
+<!-- Navbar -->
+
+<div class="navbar">
+
+    <h2>CodeQuest 👑</h2>
+
+    <div>
+        <span>Admin Panel</span>
+
+        <a href="/logout">
+            Logout
+        </a>
+    </div>
+
+</div>
+
+
+<div class="container">
+
+    <!-- Welcome -->
+
+    <div class="admin-header">
+
+        <h1>Welcome, Admin 👋</h1>
+
+        <p>
+            Manage quizzes and questions from here.
+        </p>
+
+    </div>
+
+
+    <!-- Admin Statistics -->
+
+    <div class="card-container">
+
+        <div class="card">
+
+            <h3>📝 Quizzes</h3>
+
+            <div class="stat-number">
+                {{ quizzes|length }}
+            </div>
+
+            <p>
+                Available quizzes
+            </p>
+
+        </div>
+
+
+        <div class="card">
+
+            <h3>👑 Role</h3>
+
+            <div class="stat-number">
+                Admin
+            </div>
+
+            <p>
+                Full access
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <!-- Add Quiz -->
+
+    <div class="admin-form">
+
+        <h2>➕ Add New Quiz</h2>
+
+        <form
+            method="post"
+            action="/admin/add-quiz"
+        >
+
+            <label>
+                Quiz Title
+            </label>
+
+            <input
+                type="text"
+                name="title"
+                placeholder="Example: Python Basics"
+                required
+            >
+
+            <br>
+
+            <label>
+                Description
+            </label>
+
+            <textarea
+                name="description"
+                rows="4"
+                placeholder="Enter quiz description"
+                required
+            ></textarea>
+
+            <br>
+
+            <button type="submit">
+                Add Quiz
+            </button>
+
+        </form>
+
+    </div>
+
+
+    <!-- Existing Quizzes -->
+
+    <h2 class="section-title">
+        📚 Manage Quizzes
+    </h2>
+
+
+    {% if quizzes %}
+
+        <div class="admin-quiz-grid">
+
+        {% for quiz in quizzes %}
+
+            <div class="admin-quiz-card">
+
+                <div class="quiz-icon">
+                    💻
+                </div>
+
+                <h2>
+                    {{ quiz["title"] }}
+                </h2>
+
+                <p>
+                    {{ quiz["description"] }}
+                </p>
+
+
+                <div class="admin-actions">
+
+                    <a
+                        class="btn edit-btn"
+                        href="/admin/quiz/{{ quiz['id'] }}"
+                    >
+                        📝 Manage Questions
+                    </a>
+
+
+                    <form
+                        method="post"
+                        action="/admin/quiz/{{ quiz['id'] }}/delete"
+                        onsubmit="return confirm('Are you sure you want to delete this quiz?');"
+                    >
+
+                        <button
+                            type="submit"
+                            class="delete-btn"
+                        >
+                            🗑️ Delete Quiz
+                        </button>
+
+                    </form>
+
+                </div>
+
+            </div>
+
+        {% endfor %}
+
+        </div>
+
+    {% else %}
+
+        <div class="empty-card">
+
+            <h2>📭 No Quizzes</h2>
+
+            <p>
+                You haven't created any quizzes yet.
+            </p>
+
+        </div>
+
+    {% endif %}
+
+</div>
+
+</body>
+
+</html>
