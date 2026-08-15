@@ -19,11 +19,18 @@
         </p>
         <h2>Welcome Back!</h2>
 
-        <div id="errorAlert" class="alert alert-error" style="display: none;">
-            <span class="alert-icon">❌</span>
-            <div>
-                <strong>Login Failed</strong>
-                <p id="errorMessage"></p>
+        <div id="errorAlert" class="alert alert-error" style="display: none; flex-direction: column; align-items: flex-start; gap: 10px;">
+            <div style="display: flex; align-items: center; gap: 10px; width: 100%;">
+                <span class="alert-icon">❌</span>
+                <div>
+                    <strong>Login Failed</strong>
+                    <p id="errorMessage" style="margin: 0;"></p>
+                </div>
+            </div>
+            <div id="renderUrlConfig" style="width: 100%; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px; margin-top: 5px; display: none;">
+                <label style="font-size: 13px; font-weight: bold; display: block; color: inherit; margin-bottom: 5px;">Configure Render API Backend URL:</label>
+                <input type="text" id="customApiUrl" placeholder="https://your-backend.onrender.com" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box; color: #333;">
+                <button type="button" id="saveApiUrlBtn" style="margin-top: 8px; padding: 6px 12px; font-size: 13px; background-color: #2f9e44; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">Save & Retry</button>
             </div>
         </div>
 
@@ -105,6 +112,23 @@
         } catch (err) {
             errorMessage.textContent = err.message;
             errorAlert.style.display = 'flex';
+            
+            // Show custom URL config if connection failed (Failed to fetch)
+            if (err.message.includes('Failed to fetch') || err.message.includes('network') || err.name === 'TypeError') {
+                document.getElementById('renderUrlConfig').style.display = 'block';
+                document.getElementById('customApiUrl').value = API_BASE_URL;
+            }
+        }
+    });
+
+    document.getElementById('saveApiUrlBtn').addEventListener('click', () => {
+        let val = document.getElementById('customApiUrl').value.trim();
+        if (val) {
+            if (val.endsWith('/')) {
+                val = val.slice(0, -1);
+            }
+            localStorage.setItem('api_base_url', val);
+            window.location.reload();
         }
     });
 </script>
