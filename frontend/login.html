@@ -7,12 +7,29 @@
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="stylesheet" href="style.css">
     <script src="config.js"></script>
+    <style>
+        body.login-page {
+            display: flex !important;
+            flex-direction: column !important;
+            min-height: 100vh !important;
+            margin: 0 !important;
+        }
+        .login-container {
+            flex: 1 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            min-height: auto !important;
+            padding: 40px 20px !important;
+            box-sizing: border-box !important;
+        }
+    </style>
 </head>
 
 <body class="login-page">
 
     <!-- Navigation Bar -->
-    <nav class="index-navbar" style="position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between; align-items: center; padding: 15px 30px; background-color: rgba(0,0,0,0.2); z-index: 10; box-sizing: border-box;">
+    <nav class="index-navbar" style="display: flex; justify-content: space-between; align-items: center; padding: 15px 30px; background-color: rgba(0,0,0,0.2); z-index: 10; box-sizing: border-box; width: 100%;">
         <div class="index-logo" style="font-weight: bold; font-size: 20px; color: white;">
             💻 CodeQuest
         </div>
